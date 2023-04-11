@@ -7,3 +7,8 @@ repos:
   rev: 'v0.0.261'
   hooks:
   - id: ruff
+- repo: https://github.com/PyCQA/docformatter
+  rev: v1.6.0
+  hooks:
+  - id: docformatter
+    args: ['--in-place']

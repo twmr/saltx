@@ -1,0 +1,18 @@
+[project]
+name = "saltx"
+version = "0.1.0"
+authors = [
+  { name="Thomas Hisch", email="t.hisch@gmail.com" },
+]
+description = "An efficient FEM based laser mode solver"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/thisch/saltx"
+"Bug Tracker" = "https://github.com/thisch/saltx/issues"
