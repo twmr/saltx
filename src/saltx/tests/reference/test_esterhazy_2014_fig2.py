@@ -436,23 +436,9 @@ def test_solve(D0, bc_type, system):
             mode_intensity = abs(mode_values) ** 2
             Print(f"-> {mode_intensity=}")
 
-        check_iterations = True
-
         if D0 == 1.0:
-            # we have to skip the check because the modes with the
-            # specified indices don't converge in refine_mode()
-            if system.double_size:
-                if modesel in (15, 16):
-                    check_iterations = False
-            else:
-                if modesel == 7:
-                    # k ~ 17
-                    check_iterations = False
-
-            if check_iterations:
-                assert refined_mode.converged
-                maxiterations = 9
-                assert len(refined_mode.newton_info_df) <= maxiterations
+            assert refined_mode.converged
+            assert len(refined_mode.newton_info_df) <= 9
 
             # TODO add more checks
             continue
@@ -568,8 +554,7 @@ def test_solve(D0, bc_type, system):
                 assert last_newton_step.s0 == pytest.approx(0.16160731606720716)
             assert last_newton_step.corrnorm < 1e-10
 
-        if check_iterations:
-            assert len(refined_mode.newton_info_df) <= 6
+        assert len(refined_mode.newton_info_df) <= 6
 
     # fix, ax = plt.subplots()
 
