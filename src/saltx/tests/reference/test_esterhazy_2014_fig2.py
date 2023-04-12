@@ -34,7 +34,7 @@ Print = PETSc.Sys.Print
 class BCType(enum.Enum):
     NONE = enum.auto()  # Length = 2,
     DBC = enum.auto()  # Length = 1 with DBC at x=0
-    NBC = enum.auto()  # Legnth = 1 with NBC at x=0
+    NBC = enum.auto()  # Length = 1 with NBC at x=0
 
 
 def determine_meshtags_for_1d(msh):
