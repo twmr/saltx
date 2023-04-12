@@ -1,5 +1,7 @@
 # SALT + FEniCSx = saltx
 
+[![Continuous Integration](https://img.shields.io/github/actions/workflow/status/thisch/saltx/simple.yml?label=tests)](https://github.com/thisch/saltx/actions/workflows/simple.yml)
+
 saltx is an efficient FEM based solver for the equations of the
 steady-state ab initio laser theory (SALT).
 
