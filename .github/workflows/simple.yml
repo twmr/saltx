@@ -22,8 +22,15 @@ jobs:
         with:
           environment-name: cienv
           environment-file: ./ci/requirements/py310.yml
-
       - name: Run Python
         shell: bash -l {0}
         run: |
           python -c "import dolfinx"
+      - name: Install saltx
+        shell: bash -l {0}
+        run: |
+          pip install .
+      - name: Run tests
+        shell: bash -l {0}
+        run: |
+          pytest -s --log-cli-level DEBUG --hide-plots
