@@ -414,7 +414,7 @@ def test_solve(D0, bc_type, system):
 
         minfos = [
             newtils.NewtonModeInfo(
-                k=mode.k.real, s=0.1, re_array=mode.array.real, im_array=mode.array.imag
+                k=mode.k.real, s=1.0, re_array=mode.array.real, im_array=mode.array.imag
             )
         ]
 
@@ -452,16 +452,6 @@ def test_solve(D0, bc_type, system):
             if check_iterations:
                 assert refined_mode.converged
                 maxiterations = 9
-                if modesel in (5,):
-                    # TODO when we switched to the modeinfo code I had to increase the
-                    # maxiterations to 10. Why??
-                    maxiterations = 10
-                if modesel in (12,):  # k.real=13.8
-                    # TODO figure out why modesel=12 needs more iterations
-                    # (This was not the case before we removed dielec from the
-                    # split operator function f2)
-                    # TODO compare the eigenvalues + eigenmodes
-                    maxiterations = 10
                 assert len(refined_mode.newton_info_df) <= maxiterations
 
             # TODO add more checks
