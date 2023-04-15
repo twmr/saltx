@@ -36,9 +36,11 @@ whose value corresponds to the number of lobes (in radial direction) of the mode
 Note that it is possible that j > l, because their always exists an infinite number of
 pairs (l, j) for a given l.
 """
+import time
 import enum
 from collections import namedtuple
 from pathlib import Path
+from saltx.lasing import NonLinearProblem
 from saltx.plot import plot_ellipse
 
 import matplotlib.pyplot as plt
@@ -56,6 +58,7 @@ from saltx.plot import plot_ciss_eigenvalues, plot_meshfunctions
 from saltx.pml import RectPML
 from ufl import curl, dx, elem_mult, inner
 from logging import getLogger
+from saltx.log import Timer
 
 repo_dir = Path(__file__).parent.parent.parent.parent.parent
 
@@ -151,7 +154,7 @@ def system():
     ka = 10.0
     gt = 4.0
     D0 = 0.17
-    n = 1.2
+    epsc = (1.2) ** 2
 
     mshxdmf = "quadrant_with_pml0.xdmf"
     # mshxdmf = "circle_with_pml0.xdmf"
@@ -192,6 +195,10 @@ def system():
     points = np.vstack([X.flatten(), Y.flatten()])
     evaluator = algorithms.Evaluator(V, msh, points)
     del points
+
+    n = V.dofmap.index_map.size_global
+    et = PETSc.Vec().createSeq(n)
+    et.setValue(bcs_norm_constraint[0], 1.0)
 
     fixture_locals = locals()
     nt = namedtuple("System", list(fixture_locals.keys()))(**fixture_locals)
@@ -293,6 +300,11 @@ def test_check_eigenvalues(system):
 def test_eval_traj(system):
     assert system.is_quadrant
 
+    # If set to True, determine one mode for a set of pump strengths D0 (D0range) using
+    # a newton method, otherwise the full eigenvalue problem is solved for all pump
+    # values in D0range.
+    use_newton = True
+
     def on_outer_boundary(x):
         return np.isclose(x[0], system.pml_end) | np.isclose(x[1], system.pml_end)
 
@@ -328,7 +340,7 @@ def test_eval_traj(system):
     dielec.interpolate(rectpml.dielec_eval)
     dielec.x.array[cav_dofs] = np.full_like(
         cav_dofs,
-        system.n**2,
+        system.epsc,
         dtype=PETSc.ScalarType,
     )
 
@@ -360,15 +372,103 @@ def test_eval_traj(system):
     def to_const(real_value):
         return fem.Constant(system.V.mesh, complex(real_value, 0))
 
-    vals = []
-    for D0 in np.linspace(0.05, 0.15, 4):
-        log.info(f" {D0=} ".center(80, "#"))
+    D0range = np.linspace(0.05, 0.2, 32)
+
+    if use_newton:
         nevp_inputs.Q = assemble_form(
-            to_const(D0) * pump_profile * inner(u, v) * dx, diag=0.0
+            to_const(D0range[0]) * pump_profile * inner(u, v) * dx, diag=0.0
+        )
+        modes = algorithms.get_nevp_modes(nevp_inputs, bcs=bcs["full_dbc"])
+
+        # TODO loop over more modes
+        initial_mode = modes[10]
+
+        nllp = NonLasingLinearProblem(
+            V=system.V,
+            ka=system.ka,
+            gt=system.gt,
+            et=system.et,
+            dielec=dielec,
+            invperm=invperm,
+            bcs=bcs["full_dbc"],
+            ds_obc=None,
         )
 
-        # TODO use the NonLasingLinearProblem
-        modes = algorithms.get_nevp_modes(nevp_inputs, bcs=bcs["full_dbc"])
+        nlA = nllp.create_A(system.n)
+        nlL = nllp.create_L(system.n)
+        delta_x = nllp.create_dx(system.n)
+        initial_x = nllp.create_dx(system.n)
+
+        solver = PETSc.KSP().create(system.msh.comm)
+        solver.setOperators(nlA)
+        # Preconditioner (this has a huge impact on performance!!!)
+        PC = solver.getPC()
+        PC.setType("lu")
+        PC.setFactorSolverType("mumps")
+
+        initial_x.setValues(range(system.n), initial_mode.array)
+        initial_x.setValue(system.n, initial_mode.k)
+        assert initial_x.getSize() == system.n + 1
+
+    vals = []
+    for D0 in D0range:
+        log.info(f" {D0=} ".center(80, "#"))
+        if use_newton:
+            log.error(f"Starting newton algorithm for mode @ k = {initial_mode.k}")
+            nllp.set_pump(to_const(D0) * pump_profile)
+
+            max_iterations = 20
+            i = 0
+
+            newton_steps = []
+            while i < max_iterations:
+                tstart = time.monotonic()
+                with Timer(Print, "assemble F vec and J matrix"):
+                    nllp.assemble_F_and_J(nlL, nlA, initial_x)
+                nlL.ghostUpdate(
+                    addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE
+                )
+                # Scale residual by -1
+                nlL.scale(-1)
+                nlL.ghostUpdate(
+                    addv=PETSc.InsertMode.INSERT_VALUES, mode=PETSc.ScatterMode.FORWARD
+                )
+
+                with Timer(Print, "Solve KSP"):
+                    solver.solve(nlL, delta_x)
+
+                relaxation_param = 1.0
+                initial_x += relaxation_param * delta_x
+
+                cur_k = initial_x.getValue(system.n)
+                Print(f"DELTA k: {delta_x.getValue(system.n)}")
+
+                i += 1
+
+                # Compute norm of update
+                correction_norm = delta_x.norm(0)
+
+                newton_steps.append((cur_k, correction_norm, time.monotonic() - tstart))
+
+                Print(f"----> Iteration {i}: Correction norm {correction_norm}")
+                if correction_norm < 1e-10:
+                    break
+
+            if correction_norm > 1e-10:
+                raise RuntimeError(f"mode at {initial_mode.k} didn't converge")
+
+            Print(f"Initial k: {initial_mode.k} ...")
+            df = pd.DataFrame(newton_steps, columns=["k", "corrnorm", "dt"])
+            vals.append(np.array([D0, cur_k]))
+            Print(df)
+
+            # use the current mode as an initial guess for the mode at the next D0
+            # -> we keep initial_x as is.
+        else:
+            nevp_inputs.Q = assemble_form(
+                to_const(D0) * pump_profile * inner(u, v) * dx, diag=0.0
+            )
+            modes = algorithms.get_nevp_modes(nevp_inputs, bcs=bcs["full_dbc"])
         evals = np.asarray([mode.k for mode in modes])
         vals.append(np.vstack([D0 * np.ones(evals.shape), evals]).T)
 
@@ -527,7 +627,7 @@ def test_solve(system):
     dielec.interpolate(rectpml.dielec_eval)
     dielec.x.array[cav_dofs] = np.full_like(
         cav_dofs,
-        system.n**2,
+        system.epsc,
         dtype=PETSc.ScalarType,
     )
 
@@ -550,6 +650,7 @@ def test_solve(system):
 
     Print("All modes: (sorted by k.real)")
     modes = list(sorted(modes, key=lambda m: m.k.real))
+
     for mode in modes:
         # if mode.k.imag > 0:
         Print(f" Mode({mode.bcs_name:>10}) k={mode.k}")
