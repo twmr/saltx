@@ -162,6 +162,12 @@ def system():
     is_quadrant = mshxdmf.startswith("quadrant")
     pxdmf = (repo_dir / "data" / "meshes" / mshxdmf).resolve()
 
+    with XDMFFile(MPI.COMM_WORLD, pxdmf, "r") as fh:
+        msh = fh.read_mesh(name="mcav")
+    del fh
+
+    V = fem.FunctionSpace(msh, ("Lagrange", 4))
+
     fixture_locals = locals()
     nt = namedtuple("System", list(fixture_locals.keys()))(**fixture_locals)
     return nt
@@ -318,11 +324,6 @@ def solve_nevp_wrapper(
 
 
 def test_solve(system):
-    with XDMFFile(MPI.COMM_WORLD, system.pxdmf, "r") as fh:
-        msh = fh.read_mesh(name="mcav")
-
-    V = fem.FunctionSpace(msh, ("Lagrange", 3))
-
     pml_start = 1.2
     pml_end = 1.8
 
@@ -333,35 +334,35 @@ def test_solve(system):
             return np.isclose(x[0], pml_end) | np.isclose(x[1], pml_end)
 
         bcs_dofs_dbc = fem.locate_dofs_geometrical(
-            V,
+            system.V,
             lambda x: np.isclose(x[0], 0) | np.isclose(x[1], 0) | on_outer_boundary(x),
         )
         bcs_dofs_nbc = fem.locate_dofs_geometrical(
-            V,
+            system.V,
             # at the outer pml we impose DBC but at the symmetry axes we impose NBC.
             on_outer_boundary,
         )
         bcs_dofs_mixed = fem.locate_dofs_geometrical(
-            V,
+            system.V,
             # DBC at x-axis, NBC at y-axis
             lambda x: np.isclose(x[1], 0) | on_outer_boundary(x),
         )
 
         bcs = {
             "full_dbc": [
-                fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs_dbc, V),
+                fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs_dbc, system.V),
             ],
             "full_nbc": [
-                fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs_nbc, V),
+                fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs_nbc, system.V),
             ],
             "mixed": [
-                fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs_mixed, V),
+                fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs_mixed, system.V),
             ],
         }
 
     else:
         bcs_dofs = fem.locate_dofs_geometrical(
-            V,
+            system.V,
             lambda x: np.isclose(x[0], -pml_end)
             | np.isclose(x[0], pml_end)
             | np.isclose(x[1], -pml_end)
@@ -370,7 +371,7 @@ def test_solve(system):
 
         bcs = {
             "nosym": [
-                fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs, V),
+                fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs, system.V),
             ],
         }
 
@@ -379,10 +380,10 @@ def test_solve(system):
         np.linspace(0 if system.is_quadrant else -pml_end, pml_end, 8 * 32),
     )
     points = np.vstack([X.flatten(), Y.flatten()])
-    evaluator = algorithms.Evaluator(V, msh, points)
+    evaluator = algorithms.Evaluator(system.V, system.msh, points)
 
     bcs_norm_constraint = fem.locate_dofs_geometrical(
-        V,
+        system.V,
         lambda x: np.logical_and(abs(x[0] - 0.75) < 0.15, abs(x[1] - 0.75) < 0.15),
     )
     # I only want to impose the norm constraint on a single node
@@ -392,11 +393,11 @@ def test_solve(system):
 
     rectpml = RectPML(pml_start=pml_start, pml_end=pml_end)
 
-    invperm = fem.Function(fem.VectorFunctionSpace(msh, ("DG", 0)))
+    invperm = fem.Function(fem.VectorFunctionSpace(system.msh, ("DG", 0)))
     invperm.interpolate(rectpml.invperm_eval)
     invperm = ufl.as_vector((invperm[0], invperm[1]))
 
-    Qfs = fem.FunctionSpace(msh, ("DG", 0))
+    Qfs = fem.FunctionSpace(system.msh, ("DG", 0))
     cav_dofs = fem.locate_dofs_geometrical(Qfs, lambda x: abs(x[0] + 1j * x[1]) <= 1.0)
 
     pump_profile = fem.Function(Qfs)
@@ -416,7 +417,7 @@ def test_solve(system):
     )
 
     if False:
-        plot_meshfunctions(msh, pump_profile, dielec, invperm)
+        plot_meshfunctions(system.msh, pump_profile, dielec, invperm)
         return
 
     modes, _ = solve_nevp_wrapper(
@@ -424,7 +425,7 @@ def test_solve(system):
         system.gt,
         system.D0,
         system.rg_params,
-        V,
+        system.V,
         invperm,
         dielec,
         pump_profile,
