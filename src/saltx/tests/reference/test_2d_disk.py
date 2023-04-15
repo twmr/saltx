@@ -39,6 +39,7 @@ pairs (l, j) for a given l.
 import enum
 from collections import namedtuple
 from pathlib import Path
+from saltx.plot import plot_ellipse
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -287,6 +288,115 @@ def test_check_eigenvalues(system):
 
     # There are 4 NBC modes with l=0
     assert value_counts[0] == 4
+
+
+def test_eval_traj(system):
+    assert system.is_quadrant
+
+    def on_outer_boundary(x):
+        return np.isclose(x[0], system.pml_end) | np.isclose(x[1], system.pml_end)
+
+    bcs_dofs_dbc = fem.locate_dofs_geometrical(
+        system.V,
+        lambda x: np.isclose(x[0], 0) | np.isclose(x[1], 0) | on_outer_boundary(x),
+    )
+
+    bcs = {
+        "full_dbc": [
+            fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs_dbc, system.V),
+        ],
+    }
+
+    rectpml = RectPML(pml_start=system.pml_start, pml_end=system.pml_end)
+
+    invperm = fem.Function(fem.VectorFunctionSpace(system.msh, ("DG", 0)))
+    invperm.interpolate(rectpml.invperm_eval)
+    invperm = ufl.as_vector((invperm[0], invperm[1]))
+
+    Qfs = fem.FunctionSpace(system.msh, ("DG", 0))
+    cav_dofs = fem.locate_dofs_geometrical(Qfs, lambda x: abs(x[0] + 1j * x[1]) <= 1.0)
+
+    pump_profile = fem.Function(Qfs)
+    pump_profile.x.array[:] = 0j
+    pump_profile.x.array[cav_dofs] = np.full_like(
+        cav_dofs,
+        1.0,
+        dtype=PETSc.ScalarType,
+    )
+
+    dielec = fem.Function(Qfs)
+    dielec.interpolate(rectpml.dielec_eval)
+    dielec.x.array[cav_dofs] = np.full_like(
+        cav_dofs,
+        system.n**2,
+        dtype=PETSc.ScalarType,
+    )
+
+    u = ufl.TrialFunction(system.V)
+    v = ufl.TestFunction(system.V)
+
+    def assemble_form(form, diag=1.0):
+        mat = fem.petsc.assemble_matrix(
+            fem.form(form), bcs=bcs["full_dbc"], diagonal=diag
+        )
+        mat.assemble()
+        return mat
+
+    L = assemble_form(-inner(elem_mult(invperm, curl(u)), curl(v)) * dx)
+    M = assemble_form(dielec * inner(u, v) * dx, diag=0.0)
+
+    nevp_inputs = algorithms.NEVPInputs(
+        ka=system.ka,
+        gt=system.gt,
+        rg_params=system.rg_params,
+        L=L,
+        M=M,
+        N=None,
+        Q=None,
+        R=None,
+        bcs_norm_constraint=system.bcs_norm_constraint,
+    )
+
+    def to_const(real_value):
+        return fem.Constant(system.V.mesh, complex(real_value, 0))
+
+    vals = []
+    for D0 in np.linspace(0.05, 0.15, 4):
+        log.info(f" {D0=} ".center(80, "#"))
+        nevp_inputs.Q = assemble_form(
+            to_const(D0) * pump_profile * inner(u, v) * dx, diag=0.0
+        )
+
+        # TODO use the NonLasingLinearProblem
+        modes = algorithms.get_nevp_modes(nevp_inputs, bcs=bcs["full_dbc"])
+        evals = np.asarray([mode.k for mode in modes])
+        vals.append(np.vstack([D0 * np.ones(evals.shape), evals]).T)
+
+    def scatter_plot(vals, title):
+        fig, ax = plt.subplots()
+        fig.suptitle(title)
+
+        merged = np.vstack(vals)
+        X, Y, C = (
+            merged[:, 1].real,
+            merged[:, 1].imag,
+            merged[:, 0].real,
+        )
+        norm = plt.Normalize(C.min(), C.max())
+
+        sc = ax.scatter(X, Y, c=C, norm=norm)
+        ax.set_xlabel("k.real")
+        ax.set_ylabel("k.imag")
+
+        cbar = fig.colorbar(sc, ax=ax)
+        cbar.set_label("D0", loc="top")
+
+        plot_ellipse(ax, system.rg_params)
+
+        ax.grid(True)
+
+    scatter_plot(vals, "Non-Interacting thresholds")
+    plt.show()
 
 
 def solve_nevp_wrapper(
