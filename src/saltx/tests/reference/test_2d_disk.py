@@ -54,10 +54,13 @@ from saltx import algorithms
 from saltx.plot import plot_ciss_eigenvalues, plot_meshfunctions
 from saltx.pml import RectPML
 from ufl import curl, dx, elem_mult, inner
+from logging import getLogger
 
 repo_dir = Path(__file__).parent.parent.parent.parent.parent
 
 Print = PETSc.Sys.Print
+
+log = getLogger(__name__)
 
 
 class BCType(enum.Enum):
@@ -167,6 +170,27 @@ def system():
     del fh
 
     V = fem.FunctionSpace(msh, ("Lagrange", 4))
+
+    bcs_norm_constraint = fem.locate_dofs_geometrical(
+        V,
+        lambda x: np.logical_and(abs(x[0] - 0.75) < 0.15, abs(x[1] - 0.75) < 0.15),
+    )
+    # I only want to impose the norm constraint on a single node
+    # can this be done in a simpler way?
+    bcs_norm_constraint = bcs_norm_constraint[:1]
+    Print(f"{bcs_norm_constraint=}")
+
+    # MOVE these params to the fixture
+    pml_start = 1.2
+    pml_end = 1.8
+
+    X, Y = np.meshgrid(
+        np.linspace(0 if is_quadrant else -pml_end, pml_end, 8 * 32),
+        np.linspace(0 if is_quadrant else -pml_end, pml_end, 8 * 32),
+    )
+    points = np.vstack([X.flatten(), Y.flatten()])
+    evaluator = algorithms.Evaluator(V, msh, points)
+    del points
 
     fixture_locals = locals()
     nt = namedtuple("System", list(fixture_locals.keys()))(**fixture_locals)
@@ -324,14 +348,11 @@ def solve_nevp_wrapper(
 
 
 def test_solve(system):
-    pml_start = 1.2
-    pml_end = 1.8
-
     if system.is_quadrant:
         # x=0 and y=0 are the boundaries at which we want to impose different BC
 
         def on_outer_boundary(x):
-            return np.isclose(x[0], pml_end) | np.isclose(x[1], pml_end)
+            return np.isclose(x[0], system.pml_end) | np.isclose(x[1], system.pml_end)
 
         bcs_dofs_dbc = fem.locate_dofs_geometrical(
             system.V,
@@ -363,10 +384,10 @@ def test_solve(system):
     else:
         bcs_dofs = fem.locate_dofs_geometrical(
             system.V,
-            lambda x: np.isclose(x[0], -pml_end)
-            | np.isclose(x[0], pml_end)
-            | np.isclose(x[1], -pml_end)
-            | np.isclose(x[1], pml_end),
+            lambda x: np.isclose(x[0], -system.pml_end)
+            | np.isclose(x[0], system.pml_end)
+            | np.isclose(x[1], -system.pml_end)
+            | np.isclose(x[1], system.pml_end),
         )
 
         bcs = {
@@ -375,23 +396,7 @@ def test_solve(system):
             ],
         }
 
-    X, Y = np.meshgrid(
-        np.linspace(0 if system.is_quadrant else -pml_end, pml_end, 8 * 32),
-        np.linspace(0 if system.is_quadrant else -pml_end, pml_end, 8 * 32),
-    )
-    points = np.vstack([X.flatten(), Y.flatten()])
-    evaluator = algorithms.Evaluator(system.V, system.msh, points)
-
-    bcs_norm_constraint = fem.locate_dofs_geometrical(
-        system.V,
-        lambda x: np.logical_and(abs(x[0] - 0.75) < 0.15, abs(x[1] - 0.75) < 0.15),
-    )
-    # I only want to impose the norm constraint on a single node
-    # can this be done in a simpler way?
-    bcs_norm_constraint = bcs_norm_constraint[:1]
-    Print(f"{bcs_norm_constraint=}")
-
-    rectpml = RectPML(pml_start=pml_start, pml_end=pml_end)
+    rectpml = RectPML(pml_start=system.pml_start, pml_end=system.pml_end)
 
     invperm = fem.Function(fem.VectorFunctionSpace(system.msh, ("DG", 0)))
     invperm.interpolate(rectpml.invperm_eval)
@@ -429,7 +434,7 @@ def test_solve(system):
         invperm,
         dielec,
         pump_profile,
-        bcs_norm_constraint,
+        system.bcs_norm_constraint,
         bcs,
     )
 
@@ -440,21 +445,26 @@ def test_solve(system):
         Print(f" Mode({mode.bcs_name:>10}) k={mode.k}")
 
     def add_pml_lines(ax):
-        ax.axhline(y=pml_start, c="w")
-        ax.axvline(x=pml_start, c="w")
-        ax.axhline(y=-pml_start, c="w")
-        ax.axvline(x=-pml_start, c="w")
+        ax.axhline(y=system.pml_start, c="w")
+        ax.axvline(x=system.pml_start, c="w")
+        ax.axhline(y=-system.pml_start, c="w")
+        ax.axvline(x=-system.pml_start, c="w")
         phis = np.linspace(0, 2 * np.pi, 128)
         ax.plot(np.cos(phis), np.sin(phis), "w-")
         if system.is_quadrant:
-            ax.set_xlim(0, pml_end)
-            ax.set_ylim(0, pml_end)
+            ax.set_xlim(0, system.pml_end)
+            ax.set_ylim(0, system.pml_end)
 
     plot_mode = False
     if plot_mode:
         for mode in modes:
             _, ax = plt.subplots()
-            ax.pcolormesh(X, Y, abs(evaluator(mode).reshape(X.shape)) ** 2, vmin=0.0)
+            ax.pcolormesh(
+                system.X,
+                system.Y,
+                abs(system.evaluator(mode).reshape(system.X.shape)) ** 2,
+                vmin=0.0,
+            )
             add_pml_lines(ax)
             ax.set_title(f"{mode.k=}")
 
