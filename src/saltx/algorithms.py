@@ -488,7 +488,7 @@ def constant_pump_algorithm(
         log.debug(f"Before assembly of Q with custom sht (nmodes:{len(refined_modes)})")
         Q_with_sht = assemble_form(
             pump_expr / (1 + sht) * inner(u, v) * dx,
-            zero_diag=True,
+            diag=0.0,
         )
         log.debug("After assembly of Q with custom sht")
         modes = get_nevp_modes(nevp_inputs, custom_Q=Q_with_sht, bcs=mode.bcs)

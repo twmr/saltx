@@ -63,22 +63,19 @@ def test_assemble_F_and_J():
     u = ufl.TrialFunction(V)
     v = ufl.TestFunction(V)
 
-    def assemble_form(form, zero_diag=False):
-        if zero_diag:
-            mat = fem.petsc.assemble_matrix(
-                fem.form(form),
-                bcs=bcs,
-                diagonal=PETSc.ScalarType(0),
-            )
-        else:
-            mat = fem.petsc.assemble_matrix(fem.form(form), bcs=bcs)
+    def assemble_form(form, diag=1.0):
+        mat = fem.petsc.assemble_matrix(
+            fem.form(form),
+            bcs=bcs,
+            diagonal=diag
+        )
         mat.assemble()
         return mat
 
     L = assemble_form(-inner(nabla_grad(u), nabla_grad(v)) * dx)
-    M = assemble_form(dielec * inner(u, v) * dx, zero_diag=True)
-    Q = assemble_form(D0 * pump_profile * inner(u, v) * dx, zero_diag=True)
-    R = assemble_form(inner(u, v) * ds_obc, zero_diag=True)
+    M = assemble_form(dielec * inner(u, v) * dx, diag=0.0)
+    Q = assemble_form(D0 * pump_profile * inner(u, v) * dx, diag=0.0)
+    R = assemble_form(inner(u, v) * ds_obc, diag=0.0)
 
     # there is a better way to determine n (using the dofmap)
     n = L.getSize()[0]

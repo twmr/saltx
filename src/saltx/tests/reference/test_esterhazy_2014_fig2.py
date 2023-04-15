@@ -156,22 +156,15 @@ def test_eval_traj(bc_type, system, first_threshold):
     u = ufl.TrialFunction(system.V)
     v = ufl.TestFunction(system.V)
 
-    def assemble_form(form, zero_diag=False):
-        if zero_diag:
-            mat = fem.petsc.assemble_matrix(
-                fem.form(form),
-                bcs=system.bcs,
-                diagonal=PETSc.ScalarType(0),
-            )
-        else:
-            mat = fem.petsc.assemble_matrix(fem.form(form), bcs=system.bcs)
+    def assemble_form(form, diag=1.0):
+        mat = fem.petsc.assemble_matrix(fem.form(form), bcs=system.bcs, diagonal=diag)
         mat.assemble()
         return mat
 
     log.info("Before first assembly")
     L = assemble_form(-inner(nabla_grad(u), nabla_grad(v)) * dx)
-    M = assemble_form(system.dielec * inner(u, v) * dx, zero_diag=True)
-    R = assemble_form(inner(u, v) * system.ds_obc, zero_diag=True)
+    M = assemble_form(system.dielec * inner(u, v) * dx, diag=0.0)
+    R = assemble_form(inner(u, v) * system.ds_obc, diag=0.0)
 
     nevp_inputs = algorithms.NEVPInputs(
         ka=system.ka,
@@ -209,7 +202,7 @@ def test_eval_traj(bc_type, system, first_threshold):
     for D0 in D0range:
         log.info(f" {D0=} ".center(80, "#"))
         nevp_inputs.Q = assemble_form(
-            to_const(D0) * system.pump_profile * inner(u, v) * dx, zero_diag=True
+            to_const(D0) * system.pump_profile * inner(u, v) * dx, diag=0.0
         )
 
         modes = algorithms.get_nevp_modes(nevp_inputs, bcs=system.bcs)
@@ -342,22 +335,15 @@ def test_solve(D0, bc_type, system):
     u = ufl.TrialFunction(system.V)
     v = ufl.TestFunction(system.V)
 
-    def assemble_form(form, zero_diag=False):
-        if zero_diag:
-            mat = fem.petsc.assemble_matrix(
-                fem.form(form),
-                bcs=system.bcs,
-                diagonal=PETSc.ScalarType(0),
-            )
-        else:
-            mat = fem.petsc.assemble_matrix(fem.form(form), bcs=system.bcs)
+    def assemble_form(form, diag=1.0):
+        mat = fem.petsc.assemble_matrix(fem.form(form), bcs=system.bcs, diagonal=diag)
         mat.assemble()
         return mat
 
     L = assemble_form(-inner(nabla_grad(u), nabla_grad(v)) * dx)
-    M = assemble_form(system.dielec * inner(u, v) * dx, zero_diag=True)
-    Q = assemble_form(D0 * system.pump_profile * inner(u, v) * dx, zero_diag=True)
-    R = assemble_form(inner(u, v) * system.ds_obc, zero_diag=True)
+    M = assemble_form(system.dielec * inner(u, v) * dx, diag=0.0)
+    Q = assemble_form(D0 * system.pump_profile * inner(u, v) * dx, diag=0.0)
+    R = assemble_form(inner(u, v) * system.ds_obc, diag=0.0)
 
     Print(
         f"{L.getSize()=},  DOF: {L.getInfo()['nz_used']}, MEM: {L.getInfo()['memory']}"
@@ -592,22 +578,19 @@ def test_intensity_vs_pump_esterhazy(bc_type, D0range, system):
     u = ufl.TrialFunction(system.V)
     v = ufl.TestFunction(system.V)
 
-    def assemble_form(form, zero_diag=False):
-        if zero_diag:
-            mat = fem.petsc.assemble_matrix(
-                fem.form(form),
-                bcs=system.bcs,
-                diagonal=PETSc.ScalarType(0),
-            )
-        else:
-            mat = fem.petsc.assemble_matrix(fem.form(form), bcs=system.bcs)
+    def assemble_form(form, diag=1.0):
+        mat = fem.petsc.assemble_matrix(
+            fem.form(form),
+            bcs=system.bcs,
+            diagonal=diag,
+        )
         mat.assemble()
         return mat
 
     L = assemble_form(-inner(nabla_grad(u), nabla_grad(v)) * dx)
-    M = assemble_form(system.dielec * inner(u, v) * dx, zero_diag=True)
-    Q = assemble_form(system.pump_profile * inner(u, v) * dx, zero_diag=True)
-    R = assemble_form(inner(u, v) * system.ds_obc, zero_diag=True)
+    M = assemble_form(system.dielec * inner(u, v) * dx, diag=0.0)
+    Q = assemble_form(system.pump_profile * inner(u, v) * dx, diag=0.0)
+    R = assemble_form(inner(u, v) * system.ds_obc, diag=0.0)
 
     Print(
         f"(complex-valued) NEVP: {L.getSize()=},  DOF: {L.getInfo()['nz_used']}, "
@@ -648,7 +631,7 @@ def test_intensity_vs_pump_esterhazy(bc_type, D0range, system):
     for D0 in D0range:
         Print(f" {D0=} ".center(80, "#"))
         nevp_inputs.Q = assemble_form(
-            D0 * system.pump_profile * inner(u, v) * dx, zero_diag=True
+            D0 * system.pump_profile * inner(u, v) * dx, diag=0.0
         )
         modes = algorithms.get_nevp_modes(nevp_inputs, bcs=system.bcs)
         evals = np.asarray([mode.k for mode in modes])
