@@ -446,6 +446,7 @@ def constant_pump_algorithm(
     system,  # container for system related parameters
     s_init: float = 1.0,
     first_mode_index: int | None = None,
+    real_axis_threshold=1e-10,
 ):
     u = ufl.TrialFunction(system.V)
     v = ufl.TestFunction(system.V)
@@ -508,7 +509,9 @@ def constant_pump_algorithm(
         modes = get_nevp_modes(nevp_inputs, custom_Q=Q_with_sht, bcs=mode.bcs)
         evals = np.asarray([mode.k for mode in modes])
 
-        number_of_modes_close_to_real_axis = np.sum(np.abs(evals.imag) < 1e-10)
+        number_of_modes_close_to_real_axis = np.sum(
+            np.abs(evals.imag) < real_axis_threshold
+        )
         Print(
             f"Number of modes close to real axis: {number_of_modes_close_to_real_axis}"
         )
@@ -517,7 +520,7 @@ def constant_pump_algorithm(
 
         # TODO add a couple of sanity checks (refined_modes vs modes)
 
-        number_of_modes_above_real_axis = np.sum(evals.imag > 1e-10)
+        number_of_modes_above_real_axis = np.sum(evals.imag > real_axis_threshold)
         Print(f"Number of modes above real axis: {number_of_modes_above_real_axis}")
         if number_of_modes_above_real_axis == 0:
             return refined_modes
@@ -532,6 +535,6 @@ def constant_pump_algorithm(
                 dof_at_maximum=mode.dof_at_maximum,
             )
             for mode in modes
-            if abs(mode.k.imag) < 1e-10
+            if abs(mode.k.imag) < real_axis_threshold
         ]
     raise RuntimeError("unreachable point reached")

@@ -54,7 +54,8 @@ from mpi4py import MPI
 from petsc4py import PETSc
 from ufl import curl, dx, elem_mult, inner
 
-from saltx import algorithms
+from saltx import algorithms, newtils
+from saltx.lasing import NonLinearProblem
 from saltx.log import Timer
 from saltx.nonlasing import NonLasingLinearProblem
 from saltx.plot import plot_ciss_eigenvalues, plot_ellipse, plot_meshfunctions
@@ -629,6 +630,126 @@ def test_solve(system):
     plot_mode = False
     if plot_mode:
         for mode in modes:
+            _, ax = plt.subplots()
+            ax.pcolormesh(
+                system.X,
+                system.Y,
+                abs(system.evaluator(mode).reshape(system.X.shape)) ** 2,
+                vmin=0.0,
+            )
+            add_pml_lines(ax)
+            ax.set_title(f"{mode.k=}")
+
+            plt.show()
+
+
+def test_twomodes(system):
+    # laser mode test of a system, where two modes are active
+    system = system._replace(D0=0.05, epsc=(2.0 + 0.01j) ** 2)
+    system.dielec.x.array[system.cav_dofs] = np.full_like(
+        system.cav_dofs,
+        system.epsc,
+        dtype=PETSc.ScalarType,
+    )
+
+    def on_outer_boundary(x):
+        return np.isclose(x[0], system.pml_end) | np.isclose(x[1], system.pml_end)
+
+    bcs_dofs_dbc = fem.locate_dofs_geometrical(
+        system.V,
+        lambda x: np.isclose(x[0], 0) | np.isclose(x[1], 0) | on_outer_boundary(x),
+    )
+
+    bcs = {
+        "full_dbc": [
+            fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs_dbc, system.V),
+        ],
+    }
+
+    u = ufl.TrialFunction(system.V)
+    v = ufl.TestFunction(system.V)
+
+    def assemble_form(form, diag=1.0):
+        mat = fem.petsc.assemble_matrix(
+            fem.form(form), bcs=bcs["full_dbc"], diagonal=diag
+        )
+        mat.assemble()
+        return mat
+
+    def to_const(real_value):
+        return fem.Constant(system.V.mesh, complex(real_value, 0))
+
+    L = assemble_form(-inner(elem_mult(system.invperm, curl(u)), curl(v)) * dx)
+    M = assemble_form(system.dielec * inner(u, v) * dx, diag=0.0)
+    Q = assemble_form(
+        to_const(system.D0) * system.pump_profile * inner(u, v) * dx, diag=0.0
+    )
+
+    nevp_inputs = algorithms.NEVPInputs(
+        ka=system.ka,
+        gt=system.gt,
+        rg_params=system.rg_params,
+        L=L,
+        M=M,
+        N=None,
+        Q=Q,
+        R=None,
+    )
+
+    modes = algorithms.get_nevp_modes(nevp_inputs, bcs=bcs["full_dbc"])
+    evals = np.asarray([mode.k for mode in modes])
+    plot_ciss_eigenvalues(evals, params=system.rg_params, kagt=(system.ka, system.gt))
+
+    assert modes[evals.imag.argmax()].k.imag > 0
+
+    nlp = NonLinearProblem(
+        system.V,
+        system.ka,
+        system.gt,
+        dielec=system.dielec,
+        invperm=system.invperm,
+        n=system.n,
+        ds_obc=None,
+    )
+    nlp.set_pump(to_const(system.D0) * system.pump_profile)
+
+    newton_operators = newtils.create_multimode_solvers_and_matrices(nlp, max_nmodes=2)
+    multi_modes = algorithms.constant_pump_algorithm(
+        modes,
+        nevp_inputs,
+        to_const(system.D0) * system.pump_profile,
+        nlp,
+        newton_operators,
+        to_const,
+        assemble_form,
+        system,
+        s_init=1.0,
+        # TODO What is needed to improve the accuracy of the eigenvalues of 2D
+        # eigenmodes when mode(s) are included in the hole burning term?
+        real_axis_threshold=1e-9,
+    )
+
+    assert len(multi_modes) == 2
+
+    assert multi_modes[0].k == pytest.approx(9.889501175369887)
+    assert multi_modes[1].k == pytest.approx(10.968218350229234)
+    assert multi_modes[0].s == pytest.approx(0.6462006886818594)
+    assert multi_modes[1].s == pytest.approx(0.24471349578089951)
+
+    def add_pml_lines(ax):
+        ax.axhline(y=system.pml_start, c="w")
+        ax.axvline(x=system.pml_start, c="w")
+        ax.axhline(y=-system.pml_start, c="w")
+        ax.axvline(x=-system.pml_start, c="w")
+        phis = np.linspace(0, 2 * np.pi, 128)
+        ax.plot(np.cos(phis), np.sin(phis), "w-")
+        if system.is_quadrant:
+            ax.set_xlim(0, system.pml_end)
+            ax.set_ylim(0, system.pml_end)
+
+    plot_mode = False
+    if plot_mode:
+        for mode in multi_modes:
             _, ax = plt.subplots()
             ax.pcolormesh(
                 system.X,
