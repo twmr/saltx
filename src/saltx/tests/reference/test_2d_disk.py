@@ -188,6 +188,34 @@ def system():
     pml_start = 1.2
     pml_end = 1.8
 
+    rectpml = RectPML(pml_start=pml_start, pml_end=pml_end)
+
+    invperm = fem.Function(fem.VectorFunctionSpace(msh, ("DG", 0)))
+    invperm.interpolate(rectpml.invperm_eval)
+    invperm = ufl.as_vector((invperm[0], invperm[1]))
+
+    Qfs = fem.FunctionSpace(msh, ("DG", 0))
+    cav_dofs = fem.locate_dofs_geometrical(Qfs, lambda x: abs(x[0] + 1j * x[1]) <= 1.0)
+
+    pump_profile = fem.Function(Qfs)
+    pump_profile.x.array[:] = 0j
+    pump_profile.x.array[cav_dofs] = np.full_like(
+        cav_dofs,
+        1.0,
+        dtype=PETSc.ScalarType,
+    )
+
+    dielec = fem.Function(Qfs)
+    dielec.interpolate(rectpml.dielec_eval)
+    dielec.x.array[cav_dofs] = np.full_like(
+        cav_dofs,
+        epsc,
+        dtype=PETSc.ScalarType,
+    )
+
+    if False:
+        plot_meshfunctions(msh, pump_profile, dielec, invperm)
+
     X, Y = np.meshgrid(
         np.linspace(0 if is_quadrant else -pml_end, pml_end, 8 * 32),
         np.linspace(0 if is_quadrant else -pml_end, pml_end, 8 * 32),
@@ -319,31 +347,6 @@ def test_eval_traj(system):
         ],
     }
 
-    rectpml = RectPML(pml_start=system.pml_start, pml_end=system.pml_end)
-
-    invperm = fem.Function(fem.VectorFunctionSpace(system.msh, ("DG", 0)))
-    invperm.interpolate(rectpml.invperm_eval)
-    invperm = ufl.as_vector((invperm[0], invperm[1]))
-
-    Qfs = fem.FunctionSpace(system.msh, ("DG", 0))
-    cav_dofs = fem.locate_dofs_geometrical(Qfs, lambda x: abs(x[0] + 1j * x[1]) <= 1.0)
-
-    pump_profile = fem.Function(Qfs)
-    pump_profile.x.array[:] = 0j
-    pump_profile.x.array[cav_dofs] = np.full_like(
-        cav_dofs,
-        1.0,
-        dtype=PETSc.ScalarType,
-    )
-
-    dielec = fem.Function(Qfs)
-    dielec.interpolate(rectpml.dielec_eval)
-    dielec.x.array[cav_dofs] = np.full_like(
-        cav_dofs,
-        system.epsc,
-        dtype=PETSc.ScalarType,
-    )
-
     u = ufl.TrialFunction(system.V)
     v = ufl.TestFunction(system.V)
 
@@ -354,8 +357,8 @@ def test_eval_traj(system):
         mat.assemble()
         return mat
 
-    L = assemble_form(-inner(elem_mult(invperm, curl(u)), curl(v)) * dx)
-    M = assemble_form(dielec * inner(u, v) * dx, diag=0.0)
+    L = assemble_form(-inner(elem_mult(system.invperm, curl(u)), curl(v)) * dx)
+    M = assemble_form(system.dielec * inner(u, v) * dx, diag=0.0)
 
     nevp_inputs = algorithms.NEVPInputs(
         ka=system.ka,
@@ -376,7 +379,7 @@ def test_eval_traj(system):
 
     if use_newton:
         nevp_inputs.Q = assemble_form(
-            to_const(D0range[0]) * pump_profile * inner(u, v) * dx, diag=0.0
+            to_const(D0range[0]) * system.pump_profile * inner(u, v) * dx, diag=0.0
         )
         modes = algorithms.get_nevp_modes(nevp_inputs, bcs=bcs["full_dbc"])
 
@@ -388,8 +391,8 @@ def test_eval_traj(system):
             ka=system.ka,
             gt=system.gt,
             et=system.et,
-            dielec=dielec,
-            invperm=invperm,
+            dielec=system.dielec,
+            invperm=system.invperm,
             bcs=bcs["full_dbc"],
             ds_obc=None,
         )
@@ -415,7 +418,7 @@ def test_eval_traj(system):
         log.info(f" {D0=} ".center(80, "#"))
         if use_newton:
             log.error(f"Starting newton algorithm for mode @ k = {initial_mode.k}")
-            nllp.set_pump(to_const(D0) * pump_profile)
+            nllp.set_pump(to_const(D0) * system.pump_profile)
 
             max_iterations = 20
             i = 0
@@ -466,7 +469,7 @@ def test_eval_traj(system):
             # -> we keep initial_x as is.
         else:
             nevp_inputs.Q = assemble_form(
-                to_const(D0) * pump_profile * inner(u, v) * dx, diag=0.0
+                to_const(D0) * system.pump_profile * inner(u, v) * dx, diag=0.0
             )
             modes = algorithms.get_nevp_modes(nevp_inputs, bcs=bcs["full_dbc"])
         evals = np.asarray([mode.k for mode in modes])
@@ -606,44 +609,15 @@ def test_solve(system):
             ],
         }
 
-    rectpml = RectPML(pml_start=system.pml_start, pml_end=system.pml_end)
-
-    invperm = fem.Function(fem.VectorFunctionSpace(system.msh, ("DG", 0)))
-    invperm.interpolate(rectpml.invperm_eval)
-    invperm = ufl.as_vector((invperm[0], invperm[1]))
-
-    Qfs = fem.FunctionSpace(system.msh, ("DG", 0))
-    cav_dofs = fem.locate_dofs_geometrical(Qfs, lambda x: abs(x[0] + 1j * x[1]) <= 1.0)
-
-    pump_profile = fem.Function(Qfs)
-    pump_profile.x.array[:] = 0j
-    pump_profile.x.array[cav_dofs] = np.full_like(
-        cav_dofs,
-        1.0,
-        dtype=PETSc.ScalarType,
-    )
-
-    dielec = fem.Function(Qfs)
-    dielec.interpolate(rectpml.dielec_eval)
-    dielec.x.array[cav_dofs] = np.full_like(
-        cav_dofs,
-        system.epsc,
-        dtype=PETSc.ScalarType,
-    )
-
-    if False:
-        plot_meshfunctions(system.msh, pump_profile, dielec, invperm)
-        return
-
     modes, _ = solve_nevp_wrapper(
         system.ka,
         system.gt,
         system.D0,
         system.rg_params,
         system.V,
-        invperm,
-        dielec,
-        pump_profile,
+        system.invperm,
+        system.dielec,
+        system.pump_profile,
         system.bcs_norm_constraint,
         bcs,
     )
