@@ -40,7 +40,7 @@ import time
 import enum
 from collections import namedtuple
 from pathlib import Path
-from saltx.lasing import NonLinearProblem
+from saltx.nonlasing import NonLasingLinearProblem
 from saltx.plot import plot_ellipse
 
 import matplotlib.pyplot as plt
@@ -259,7 +259,7 @@ def test_check_eigenvalues(system):
                     ka=system.ka,
                     gt=system.gt,
                     D0=system.D0,
-                    nc=system.n,
+                    nc=np.sqrt(system.epsc),
                 )
                 for quantum_l in range(0, 20)
             ]
