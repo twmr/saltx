@@ -75,7 +75,7 @@ class NonLasingLinearProblem:
         self.invperm = invperm or 1
         self.pump = None
 
-        # conduction loss of the cold (not-pumped) cavity
+        # dielectric loss of the cold (not-pumped) cavity
         self.sigma_c = None
 
         self.bcs = bcs

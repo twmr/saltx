@@ -62,10 +62,10 @@ class NEVPInputs:
     rg_params: tuple[float]
     L: PETSc.Mat
     M: PETSc.Mat
-    # cold cavity conduction loss
+    # cold cavity dielectric loss term
     N: PETSc.Mat | None
-    # The matrix Q depends on a pump parameter (usually this pump parameter is
-    # called D0)
+    # The matrix Q depends on a pump parameter (usually this pump parameter is called
+    # D0)
     Q: PETSc.Mat
     R: PETSc.Mat | None  # can only be used for 1D systems
     bcs_norm_constraint: np.ndarray

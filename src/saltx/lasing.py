@@ -58,7 +58,7 @@ class NonLinearProblem:
         # is set later by set_pump
         self.pump = None
 
-        # conduction loss of the cold (unpumped cavity)
+        # dielectric loss of the cold (not-pumped) cavity
         self.sigma_c = None
 
         self.n = n
