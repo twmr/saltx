@@ -240,7 +240,6 @@ def test_eval_traj(system):
             system.et,
             dielec=system.dielec,
             n=system.n,
-            use_real_jac=True,
             ds_obc=system.ds_obc,
         )
         nlp.set_pump(to_const(1.0) * system.pump_profile)
@@ -428,7 +427,6 @@ def test_solve(D0, system):
         system.et,
         dielec=system.dielec,
         n=system.n,
-        use_real_jac=True,
         ds_obc=system.ds_obc,
     )
     nlp.set_pump(to_const(D0) * system.pump_profile)
@@ -524,7 +522,6 @@ def test_intensity_vs_pump(system):
         system.et,
         dielec=system.dielec,
         n=system.n,
-        use_real_jac=True,
         ds_obc=system.ds_obc,
     )
     newton_operators = newtils.create_multimode_solvers_and_matrices(nlp, max_nmodes=2)

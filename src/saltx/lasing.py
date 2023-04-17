@@ -40,7 +40,6 @@ class NonLinearProblem:
         et,
         dielec: float | fem.Function,
         n: int,
-        use_real_jac=False,
         invperm: fem.Function | None = None,
         ds_obc=None,  # only needed for 1D
         max_nmodes=5,
@@ -62,7 +61,6 @@ class NonLinearProblem:
         self.sigma_c = None
 
         self.n = n
-        self.use_real_jac = use_real_jac
         self.ds_obc = ds_obc
 
         self.zero = 0  # fem.Constant(self.V.mesh, 0j)
@@ -86,8 +84,6 @@ class NonLinearProblem:
         # Reset the residual vector
         with L.localForm() as L_local:
             L_local.set(0.0)
-
-        assert self.use_real_jac
 
         # N = A.getSize()[0]
         # assert N == A.getSize()[1]

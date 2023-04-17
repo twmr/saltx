@@ -24,7 +24,6 @@ Print = PETSc.Sys.Print
 def test_assemble_F_and_J():
     # TODO improve this unit-test
     D0 = 0.37
-    use_real_jac = True
 
     dielec = 1.2**2
     pump_profile = 1.0
@@ -102,7 +101,6 @@ def test_assemble_F_and_J():
         et,
         dielec=dielec,
         n=n,
-        use_real_jac=use_real_jac,
         ds_obc=ds_obc,
     )
     nlp.set_pump(D0)

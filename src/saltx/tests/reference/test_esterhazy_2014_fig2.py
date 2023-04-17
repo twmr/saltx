@@ -189,7 +189,6 @@ def test_eval_traj(bc_type, system, first_threshold):
             system.et,
             dielec=system.dielec,
             n=system.n,
-            use_real_jac=True,
             ds_obc=system.ds_obc,
         )
         nlp.set_pump(to_const(1.0) * system.pump_profile)
@@ -371,7 +370,6 @@ def test_solve(D0, bc_type, system):
         system.et,
         dielec=system.dielec,
         n=system.n,
-        use_real_jac=True,
         ds_obc=system.ds_obc,
     )
     nlp.set_pump(D0)
@@ -544,11 +542,8 @@ def test_solve(D0, bc_type, system):
 
     # fix, ax = plt.subplots()
 
-    # if use_real_jac:
-    #     ref = initial_x.getArray()[:-2]
-    #     modevals = abs(ref[:n] + 1j * ref[n : 2 * n]) ** 2
-    # else:
-    #     modevals = abs(initial_x.getArray()[:-1]) ** 2
+    # ref = initial_x.getArray()[:-2]
+    # modevals = abs(ref[:n] + 1j * ref[n : 2 * n]) ** 2
     # ax.plot(modevals)
     # plt.show()
 
@@ -597,7 +592,6 @@ def test_multimode_solve(D0, bc_type, system):
         system.et,
         dielec=system.dielec,
         n=system.n,
-        use_real_jac=True,
         ds_obc=system.ds_obc,
     )
     nlp.set_pump(D0)
@@ -695,7 +689,6 @@ def test_intensity_vs_pump_esterhazy(bc_type, D0range, system):
         system.et,
         dielec=system.dielec,
         n=system.n,
-        use_real_jac=True,
         ds_obc=system.ds_obc,
     )
 
