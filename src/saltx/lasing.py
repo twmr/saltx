@@ -106,6 +106,7 @@ class NonLinearProblem:
             k = fem.Constant(self.mesh, complex(minfo.k, 0))
             s = fem.Constant(self.mesh, complex(minfo.s, 0))
             modes_data.append((b, k, s))
+        del b, k, s
 
         print(f"eval F and J at k={[m.k for m in minfos]}, s={[m.s for m in minfos]}")
 
@@ -486,7 +487,7 @@ class NonLinearProblem:
         ):
             calc_Fre_and_Fim(b_row, k_row, Wre_row, Wim_row)
 
-            etbm1 = b.vector.dot(self.et) - 1
+            etbm1 = b_row.vector.dot(self.et) - 1
             if abs(etbm1) > 1e-12:
                 print(f"{etbm1=}")
             etbm1s.extend([etbm1.real, etbm1.imag])
