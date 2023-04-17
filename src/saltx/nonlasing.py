@@ -57,7 +57,6 @@ class NonLasingLinearProblem:
         V,
         ka,
         gt,
-        et,
         dielec: float | fem.Function,
         invperm: fem.Function | None,
         bcs,
@@ -67,7 +66,6 @@ class NonLasingLinearProblem:
         self.V = V
         self.ka = ka
         self.gt = gt
-        self.et = et
 
         # size of the fem matrices
         self.n = V.dofmap.index_map.size_global
@@ -132,7 +130,9 @@ class NonLasingLinearProblem:
 
         print(f"norm F_petsc {F_petsc.norm(0)}")
 
-    def assemble_F_and_J(self, L: PETSc.Vec, A: PETSc.Mat, x: PETSc.Vec) -> None:
+    def assemble_F_and_J(
+        self, L: PETSc.Vec, A: PETSc.Mat, x: PETSc.Vec, dof_at_maximum: int
+    ) -> None:
         # assemble F(x) into the vector L
         # and J(x) into the matrix A
 
@@ -187,7 +187,7 @@ class NonLasingLinearProblem:
 
         print(f"norm F_petsc {F_petsc.norm(0)}")
 
-        etbm1 = b.vector.dot(self.et) - 1
+        etbm1 = b.vector.getValue(dof_at_maximum) - 1
         if abs(etbm1) > 1e-12:
             print(f"{etbm1=}")
 
@@ -230,8 +230,6 @@ class NonLasingLinearProblem:
             N = self.sigma_c * inner(u, v) * dx
             dFdu += 1j * k * N
 
-        dfdu = self.et
-
         if self.mat_dF_du is None or self.vec_dF_dk is None:
             with Timer(print, "creation of spare J matrices"):
                 if self.mat_dF_du is None:
@@ -248,7 +246,7 @@ class NonLasingLinearProblem:
             fem.set_bc(self.vec_dF_dk, self.bcs)
 
         jacobian.assemble_complex_singlemode_jacobian_matrix(
-            A, self.mat_dF_du, self.vec_dF_dk, dfdu
+            A, self.mat_dF_du, self.vec_dF_dk, dof_at_maximum
         )
 
     def create_A(self, n_fem):

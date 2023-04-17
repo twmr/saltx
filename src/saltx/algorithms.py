@@ -38,6 +38,7 @@ class NEVPNonLasingMode:  # The solutions of a nonlinear (in k) EVP
     # D0: float
     bcs_name: str | None
     bcs: list
+    dof_at_maximum: int
 
 
 @dataclasses.dataclass
@@ -45,6 +46,7 @@ class NEVPNonLasingModeRealK:  # The newton modes (above the threshold)
     array: np.ndarray  # fixed phase
     s: float
     k: float
+    dof_at_maximum: int
     # TODO introduce a pump_parameter instead of D0
     # D0: float
     newton_info_df: pd.DataFrame
@@ -68,7 +70,6 @@ class NEVPInputs:
     # D0)
     Q: PETSc.Mat
     R: PETSc.Mat | None  # can only be used for 1D systems
-    bcs_norm_constraint: np.ndarray
 
 
 class Evaluator:
@@ -227,17 +228,24 @@ def get_nevp_modes(
         _lam = nep.getEigenpair(i, x)
         res = nep.computeError(i)
         mode = x.getArray().copy()
-        norm_val = mode[nevp_inputs.bcs_norm_constraint[0]]
+
+        dof_at_maximum = np.abs(mode).argmax()
+        val_maximum = mode[np.abs(mode).argmax()]
         Print(
             f" {_lam.real:9f}{_lam.imag:+9f} j {res:12g}   "
-            f"{norm_val.real:2g} j {norm_val.imag:2g}"
+            f"{val_maximum.real:2g} j {val_maximum.imag:2g}"
         )
 
         # fix norm and the phase
-        mode /= mode[nevp_inputs.bcs_norm_constraint[0]]
+        mode /= val_maximum
         modes.append(
             NEVPNonLasingMode(
-                array=mode, k=_lam, error=res, bcs_name=bcs_name, bcs=bcs or []
+                array=mode,
+                k=_lam,
+                error=res,
+                bcs_name=bcs_name,
+                bcs=bcs or [],
+                dof_at_maximum=dof_at_maximum,
             )
         )
     Print()
@@ -319,6 +327,7 @@ def _refine_modes(
 ):
     nmodes = len(modeinfos)
     newtils.fill_vector_with_modeinfos(initial_x, modeinfos)
+    initial_dof_at_maximums = [minfo.dof_at_maximum for minfo in modeinfos]
 
     # TODO maybe we should call set bcs here in nlp:
     # nlp.bcs = mode.bcs (instead of passing the bcs to assemble_*)
@@ -360,6 +369,9 @@ def _refine_modes(
         minfos = newtils.extract_newton_mode_infos(
             initial_x, nmodes=nmodes, real_sanity_check=sanity_checks
         )
+        for minfo, dof_at_maximum in zip(minfos, initial_dof_at_maximums):
+            minfo.dof_at_maximum = dof_at_maximum
+
         cur_k, cur_s = [mi.k for mi in minfos], [mi.s for mi in minfos]
         delta_k, delta_s = newtils.extract_k_and_s(
             delta_x, nmodes=nmodes, real_sanity_check=sanity_checks
@@ -411,6 +423,7 @@ def _refine_modes(
             k=minfo.k,
             s=minfo.s,
             # D0=nlp.D0,
+            dof_at_maximum=minfo.dof_at_maximum,
             converged=converged,
             setup_time=0,  # tsetup_end - tsetup_start,
             computation_time=computation_time,
@@ -462,6 +475,7 @@ def constant_pump_algorithm(
                 s=s_init,
                 re_array=mode.array.real,
                 im_array=mode.array.imag,
+                dof_at_maximum=mode.dof_at_maximum,
             )
         )
 
@@ -515,6 +529,7 @@ def constant_pump_algorithm(
                 s=s_init,
                 re_array=mode.array.real,
                 im_array=mode.array.imag,
+                dof_at_maximum=mode.dof_at_maximum,
             )
             for mode in modes
             if abs(mode.k.imag) < 1e-10

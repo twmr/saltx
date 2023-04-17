@@ -175,15 +175,6 @@ def system():
 
     V = fem.FunctionSpace(msh, ("Lagrange", 4))
 
-    bcs_norm_constraint = fem.locate_dofs_geometrical(
-        V,
-        lambda x: np.logical_and(abs(x[0] - 0.75) < 0.15, abs(x[1] - 0.75) < 0.15),
-    )
-    # I only want to impose the norm constraint on a single node
-    # can this be done in a simpler way?
-    bcs_norm_constraint = bcs_norm_constraint[:1]
-    Print(f"{bcs_norm_constraint=}")
-
     # MOVE these params to the fixture
     pml_start = 1.2
     pml_end = 1.8
@@ -225,8 +216,6 @@ def system():
     del points
 
     n = V.dofmap.index_map.size_global
-    et = PETSc.Vec().createSeq(n)
-    et.setValue(bcs_norm_constraint[0], 1.0)
 
     fixture_locals = locals()
     nt = namedtuple("System", list(fixture_locals.keys()))(**fixture_locals)
@@ -369,7 +358,6 @@ def test_eval_traj(system):
         N=None,
         Q=None,
         R=None,
-        bcs_norm_constraint=system.bcs_norm_constraint,
     )
 
     def to_const(real_value):
@@ -390,7 +378,6 @@ def test_eval_traj(system):
             V=system.V,
             ka=system.ka,
             gt=system.gt,
-            et=system.et,
             dielec=system.dielec,
             invperm=system.invperm,
             bcs=bcs["full_dbc"],
@@ -427,7 +414,9 @@ def test_eval_traj(system):
             while i < max_iterations:
                 tstart = time.monotonic()
                 with Timer(Print, "assemble F vec and J matrix"):
-                    nllp.assemble_F_and_J(nlL, nlA, initial_x)
+                    nllp.assemble_F_and_J(
+                        nlL, nlA, initial_x, initial_mode.dof_at_maximum
+                    )
                 nlL.ghostUpdate(
                     addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE
                 )
@@ -511,7 +500,6 @@ def solve_nevp_wrapper(
     invperm,
     dielec,
     pump_profile,
-    bcs_norm_constraint,
     bcs: dict[str, list],
 ):
     u = ufl.TrialFunction(V)
@@ -547,7 +535,6 @@ def solve_nevp_wrapper(
             N=None,
             Q=Q,
             R=None,
-            bcs_norm_constraint=bcs_norm_constraint,
         )
         all_modes.extend(
             algorithms.get_nevp_modes(
@@ -618,7 +605,6 @@ def test_solve(system):
         system.invperm,
         system.dielec,
         system.pump_profile,
-        system.bcs_norm_constraint,
         bcs,
     )
 

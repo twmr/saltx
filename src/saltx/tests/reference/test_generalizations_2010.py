@@ -154,18 +154,7 @@ def system():
     #         fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs, V),
     #     ]
 
-    bcs_norm_constraint = fem.locate_dofs_geometrical(
-        V,
-        lambda x: x[0] > 0.75,
-    )
-    # I only want to impose the norm constraint on a single node
-    # can this be done in a simpler way?
-    bcs_norm_constraint = bcs_norm_constraint[:1]
-    Print(f"{bcs_norm_constraint=}")
-
     n = V.dofmap.index_map.size_global
-    et = PETSc.Vec().createSeq(n)
-    et.setValue(bcs_norm_constraint[0], 1.0)
 
     fixture_locals = locals()
     nt = namedtuple("System", list(fixture_locals.keys()))(**fixture_locals)
@@ -226,7 +215,6 @@ def test_eval_traj(system):
         N=None,
         Q=None,
         R=R,
-        bcs_norm_constraint=system.bcs_norm_constraint,
     )
 
     def to_const(real_value):
@@ -237,7 +225,6 @@ def test_eval_traj(system):
             system.V,
             system.ka,
             system.gt,
-            system.et,
             dielec=system.dielec,
             n=system.n,
             ds_obc=system.ds_obc,
@@ -415,7 +402,6 @@ def test_solve(D0, system):
         N=None,
         Q=Q,
         R=R,
-        bcs_norm_constraint=system.bcs_norm_constraint,
     )
     modes = algorithms.get_nevp_modes(nevp_inputs, bcs=system.bcs)
     evals = np.asarray([mode.k for mode in modes])
@@ -424,7 +410,6 @@ def test_solve(D0, system):
         system.V,
         system.ka,
         system.gt,
-        system.et,
         dielec=system.dielec,
         n=system.n,
         ds_obc=system.ds_obc,
@@ -512,14 +497,12 @@ def test_intensity_vs_pump(system):
         N=None,
         Q=Q,
         R=R,
-        bcs_norm_constraint=system.bcs_norm_constraint,
     )
 
     nlp = NonLinearProblem(
         system.V,
         system.ka,
         system.gt,
-        system.et,
         dielec=system.dielec,
         n=system.n,
         ds_obc=system.ds_obc,

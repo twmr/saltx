@@ -151,8 +151,7 @@ def assemble_salt_jacobian_block_matrix(
     dF_dvw: PETSc.Mat,
     dFReIm_dk_seq: list[PETSc.Vec],
     dFReIm_ds_seq: list[PETSc.Vec],
-    df_dv_seq: list[np.ndarray],
-    dg_dw_seq: list[np.ndarray],
+    dof_at_maximums: list[int],
     nmodes: int,
 ) -> None:
     """
@@ -171,8 +170,7 @@ def assemble_salt_jacobian_block_matrix(
     assert 2 * n * nmodes + 2 * nmodes == N
     assert len(dFReIm_ds_seq) == nmodes
     assert len(dFReIm_dk_seq) == nmodes
-    assert len(df_dv_seq) == nmodes
-    assert len(dg_dw_seq) == nmodes
+    assert len(dof_at_maximums) == nmodes
 
     if False:  # for debugging
         fnamemap = dict(
@@ -237,14 +235,11 @@ def assemble_salt_jacobian_block_matrix(
 
     # row vectors
     # we have 2*nmodes additional row vectors
-    for midx, df_dv in enumerate(df_dv_seq):
+    for midx, dof_at_maximum in enumerate(dof_at_maximums):
         row_idx = 2 * n * nmodes + 2 * midx
         col_shift = 2 * n * midx
-        A.setValues(row_idx, range(col_shift, col_shift + n), df_dv, addv=addv)
-    for midx, dg_dw in enumerate(dg_dw_seq):
-        row_idx = 2 * n * nmodes + 2 * midx + 1
-        col_shift = 2 * n * midx
-        A.setValues(row_idx, range(col_shift + n, col_shift + 2 * n), dg_dw, addv=addv)
+        A.setValue(row_idx, col_shift + dof_at_maximum, 1.0, addv=addv)
+        A.setValue(row_idx + 1, col_shift + n + dof_at_maximum, 1.0, addv=addv)
 
     print(f"insert values + J.setValues of J took {time.monotonic()-t_insert_0:.2e}s")
 
@@ -268,7 +263,7 @@ def assemble_complex_singlemode_jacobian_matrix(
     A: PETSc.Mat,
     dF_du,
     dF_dk,
-    df_du,
+    dof_at_maximum: int,
 ) -> None:
     """
     Parameters
@@ -304,12 +299,7 @@ def assemble_complex_singlemode_jacobian_matrix(
     )
 
     # row vectors
-    A.setValues(
-        n,
-        range(n),
-        df_du,
-        addv=PETSc.InsertMode.ADD,
-    )
+    A.setValue(n, dof_at_maximum, 1.0, addv=PETSc.InsertMode.ADD)
 
     # scalars
 

@@ -50,15 +50,6 @@ def test_assemble_F_and_J():
         fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs, V),
     ]
 
-    bcs_norm_constraint = fem.locate_dofs_geometrical(
-        V,
-        lambda x: x[0] > 0.75,
-    )
-    # I only want to impose the norm constraint on a single node
-    # can this be done in a simpler way?
-    bcs_norm_constraint = bcs_norm_constraint[:1]
-    Print(f"{bcs_norm_constraint=}")
-
     u = ufl.TrialFunction(V)
     v = ufl.TestFunction(V)
 
@@ -87,18 +78,14 @@ def test_assemble_F_and_J():
         N=None,
         Q=Q,
         R=R,
-        bcs_norm_constraint=bcs_norm_constraint,
     )
     modes = algorithms.get_nevp_modes(nevp_inputs, bcs=bcs)
     evals = np.asarray([mode.k for mode in modes])
 
-    et = PETSc.Vec().createSeq(n)
-    et.setValue(bcs_norm_constraint[0], 1.0)
     nlp = NonLinearProblem(
         V,
         ka,
         gt,
-        et,
         dielec=dielec,
         n=n,
         ds_obc=ds_obc,
@@ -114,7 +101,11 @@ def test_assemble_F_and_J():
 
     minfos = [
         newtils.NewtonModeInfo(
-            k=mode.k.real, s=0.1, re_array=mode.array.real, im_array=mode.array.imag
+            k=mode.k.real,
+            s=0.1,
+            re_array=mode.array.real,
+            im_array=mode.array.imag,
+            dof_at_maximum=mode.dof_at_maximum,
         )
     ]
 
@@ -154,48 +145,25 @@ def test_assemble_F_and_J():
             [0, 1, 2, 3, 4, 5, 6, 3001, 3002, 3003, 3004, 3005, 3006, 3007, 6002, 6003]
         ),
     )
-    # np.testing.assert_array_equal(
-    #     v1.real,
-    #     np.array(
-    #         [
-    #             0.00000000e00 + 0.00000000e00j,
-    #             -8.66664890e03 - 2.78999149e-21j,
-    #             -7.11754950e02 + 5.19887646e-22j,
-    #             4.87842162e03 - 5.19882434e-22j,
-    #             1.66668147e02 - 2.32494620e-22j,
-    #             4.87842162e03 - 5.19889383e-22j,
-    #             -7.11754950e02 + 5.19880696e-22j,
-    #             0.00000000e00 + 0.00000000e00j,
-    #             4.64195573e-03 + 2.05594203e-20j,
-    #             -8.64977907e-04 - 3.83102645e-21j,
-    #             8.64977104e-04 + 3.83101933e-21j,
-    #             3.86828924e-04 + 1.71327864e-21j,
-    #             8.64978175e-04 + 3.83102882e-21j,
-    #             -8.64976836e-04 - 3.83101696e-21j,
-    #             3.71376379e-05 + 0.00000000e00j,
-    #             5.26918379e-10 + 0.00000000e00j,
-    #         ]
-    #     ).real,
-    # )
 
     expected_v1 = np.array(
         [
             0.00000000e00 + 0.00000000e00j,
-            -8.66664890e03 - 2.78999149e-21j,
-            -7.11754950e02 + 5.19887646e-22j,
-            4.87842162e03 - 5.19882434e-22j,
-            1.66668147e02 - 2.32494620e-22j,
-            4.87842162e03 - 5.19889383e-22j,
-            -7.11754950e02 + 5.19880696e-22j,
+            -8.66664890e03 - 2.79001631e-21j,
+            -7.11754950e02 + 5.19890275e-22j,
+            4.87842162e03 - 5.19888097e-22j,
+            1.66668147e02 - 2.32499407e-22j,
+            4.87842162e03 - 5.19891001e-22j,
+            -7.11754950e02 + 5.19887371e-22j,
             0.00000000e00 + 0.00000000e00j,
-            4.64195573e-03 + 2.05594203e-20j,
-            -8.64977907e-04 - 3.83102645e-21j,
-            8.64977104e-04 + 3.83101933e-21j,
-            3.86828924e-04 + 1.71327864e-21j,
-            8.64978175e-04 + 3.83102882e-21j,
-            -8.64976836e-04 - 3.83101696e-21j,
-            3.71376379e-05 + 0.00000000e00j,
-            5.26918379e-10 + 0.00000000e00j,
+            4.64195961e-03 + 2.05594547e-20j,
+            -8.64978319e-04 - 3.83103010e-21j,
+            8.64977991e-04 + 3.83102719e-21j,
+            3.86829674e-04 + 1.71328529e-21j,
+            8.64978428e-04 + 3.83103106e-21j,
+            -8.64977882e-04 - 3.83102622e-21j,
+            -3.45630749e-05 + 0.00000000e00j,
+            -1.39503168e-10 + 0.00000000e00j,
         ]
     )
     # FIXME why is the accuracy so small?

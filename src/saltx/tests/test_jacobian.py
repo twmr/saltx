@@ -232,7 +232,6 @@ def test_create_and_assemble_salt_jacobian(nmodes):
     V = fem.FunctionSpace(msh, ("Lagrange", 3))
 
     Wre, Wim = V.clone(), V.clone()
-    n = V.dofmap.index_map.size_global
 
     u0, u1 = ufl.TrialFunction(Wre), ufl.TrialFunction(Wim)
     v0, v1 = ufl.TestFunction(Wre), ufl.TestFunction(Wim)
@@ -243,11 +242,6 @@ def test_create_and_assemble_salt_jacobian(nmodes):
         v2, v3 = ufl.TestFunction(W2re), ufl.TestFunction(W2im)
 
     bcs = []
-
-    et = PETSc.Vec().createSeq(n)
-    et.setValue(500, 1.0)
-    df_dv = et.array.real
-    dg_dw = et.array.real
 
     b = fem.Function(V)
     b.x.array[:] = 1.234
@@ -340,12 +334,14 @@ def test_create_and_assemble_salt_jacobian(nmodes):
 
         dFds_seq = [vec_dF_ds1, vec_dF_ds2]
 
+    n = V.dofmap.index_map.size_global
+    assert n > 500
+    dof_at_maximums = [500] * nmodes
     assemble_salt_jacobian_block_matrix(
         A,
         mat_dF_dvw,
         dFdk_seq,
         dFds_seq,
-        [df_dv] * nmodes,
-        [dg_dw] * nmodes,
+        dof_at_maximums,
         nmodes=nmodes,
     )

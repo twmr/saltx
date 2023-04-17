@@ -37,7 +37,6 @@ class NonLinearProblem:
         V,
         ka,
         gt,
-        et,
         dielec: float | fem.Function,
         n: int,
         invperm: fem.Function | None = None,
@@ -49,7 +48,6 @@ class NonLinearProblem:
         self.mesh = V.mesh
         self.ka = fem.Constant(V.mesh, complex(ka, 0))
         self.gt = fem.Constant(V.mesh, complex(gt, 0))
-        self.et = et
 
         self.dielec = dielec
         self.invperm = invperm or 1
@@ -101,7 +99,7 @@ class NonLinearProblem:
             b.x.array[:] = minfo.cmplx_array
             k = fem.Constant(self.mesh, complex(minfo.k, 0))
             s = fem.Constant(self.mesh, complex(minfo.s, 0))
-            modes_data.append((b, k, s))
+            modes_data.append((b, k, s, minfo.dof_at_maximum))
         del b, k, s
 
         print(f"eval F and J at k={[m.k for m in minfos]}, s={[m.s for m in minfos]}")
@@ -126,7 +124,7 @@ class NonLinearProblem:
         def dGk_dk(k):
             return -2 * (k - ka) / ((k - ka) ** 2 + gt**2) * Gk(k)  # p. 116
 
-        sht = sum(Gk(k) * s**2 * abs(b) ** 2 for (b, k, s) in modes_data)
+        sht = sum(Gk(k) * s**2 * abs(b) ** 2 for (b, k, s, _) in modes_data)
 
         curl = self._curl
         mult = self._mult
@@ -478,18 +476,19 @@ class NonLinearProblem:
         )
         dF_dk_seq, dF_ds_seq = [], []
         # product loop for filling the a_form_array with forms
-        for mode_row_index, ((b_row, k_row, s_row), (Wre_row, Wim_row)) in enumerate(
-            zip(modes_data, spaces)
-        ):
+        for mode_row_index, (
+            (b_row, k_row, s_row, dof_at_maximum),
+            (Wre_row, Wim_row),
+        ) in enumerate(zip(modes_data, spaces)):
             calc_Fre_and_Fim(b_row, k_row, Wre_row, Wim_row)
 
-            etbm1 = b_row.vector.dot(self.et) - 1
+            etbm1 = b_row.vector.getValue(dof_at_maximum) - 1
             if abs(etbm1) > 1e-12:
                 print(f"{etbm1=}")
             etbm1s.extend([etbm1.real, etbm1.imag])
 
             for mode_col_index, (
-                (b_col, k_col, s_col),
+                (b_col, k_col, s_col, _),
                 (Wre_col, Wim_col),
             ) in enumerate(zip(modes_data, spaces)):
                 if mode_row_index == mode_col_index:
@@ -514,12 +513,12 @@ class NonLinearProblem:
 
         # column vectors (vec_F_petsc, vec_dF_ds_seq, vec_dF_dk_seq)
         for mode_col_index, (
-            (b_col, k_col, s_col),
+            (b_col, k_col, s_col, _),
             (Wre_col, Wim_col),
         ) in enumerate(zip(modes_data, spaces)):
             local_dF_dk_column, local_dF_ds_column = [], []
             for mode_row_index, (
-                (b_row, k_row, s_row),
+                (b_row, k_row, s_row, _),
                 (Wre_row, Wim_row),
             ) in enumerate(zip(modes_data, spaces)):
                 if mode_col_index == mode_row_index:
@@ -604,9 +603,6 @@ class NonLinearProblem:
 
         # 1 x n
 
-        df_dv = self.et.array.real
-        dg_dw = self.et.array.real
-
         with Timer(print, "ass bilinear forms"):
             mat_dF_dvw = matvec_coll.mat_dF_dvw
             mat_dF_dvw.zeroEntries()  # not sure if this is really needed
@@ -650,10 +646,7 @@ class NonLinearProblem:
                 # [dFx_dk1, dFx_dk2]
                 matvec_coll.vec_dF_dk_seq,
                 matvec_coll.vec_dF_ds_seq,
-                # for two modes:
-                # [df1_dv1, df2_dv2]
-                [df_dv] * len(dF_dk_seq),
-                [dg_dw] * len(dF_dk_seq),
+                [minfo.dof_at_maximum for minfo in minfos],
                 nmodes=len(dF_dk_seq),
             )
 

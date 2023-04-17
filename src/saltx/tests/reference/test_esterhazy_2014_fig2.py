@@ -118,18 +118,7 @@ def system(bc_type):
             fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs, V),
         ]
 
-    bcs_norm_constraint = fem.locate_dofs_geometrical(
-        V,
-        lambda x: x[0] > 0.75,
-    )
-    # I only want to impose the norm constraint on a single node
-    # can this be done in a simpler way?
-    bcs_norm_constraint = bcs_norm_constraint[:1]
-    Print(f"{bcs_norm_constraint=}")
-
     n = V.dofmap.index_map.size_global
-    et = PETSc.Vec().createSeq(n)
-    et.setValue(bcs_norm_constraint[0], 1.0)
 
     fixture_locals = locals()
     nt = namedtuple("System", list(fixture_locals.keys()))(**fixture_locals)
@@ -175,7 +164,6 @@ def test_eval_traj(bc_type, system, first_threshold):
         N=None,
         Q=None,
         R=R,
-        bcs_norm_constraint=system.bcs_norm_constraint,
     )
 
     def to_const(real_value):
@@ -186,7 +174,6 @@ def test_eval_traj(bc_type, system, first_threshold):
             system.V,
             system.ka,
             system.gt,
-            system.et,
             dielec=system.dielec,
             n=system.n,
             ds_obc=system.ds_obc,
@@ -219,6 +206,7 @@ def test_eval_traj(bc_type, system, first_threshold):
                     s=1.0,
                     re_array=mode.array.real,
                     im_array=mode.array.imag,
+                    dof_at_maximum=mode.dof_at_maximum,
                 )
             ]
 
@@ -357,7 +345,6 @@ def test_solve(D0, bc_type, system):
         N=None,
         Q=Q,
         R=R,
-        bcs_norm_constraint=system.bcs_norm_constraint,
     )
     modes = algorithms.get_nevp_modes(nevp_inputs, bcs=system.bcs)
 
@@ -367,7 +354,6 @@ def test_solve(D0, bc_type, system):
         system.V,
         system.ka,
         system.gt,
-        system.et,
         dielec=system.dielec,
         n=system.n,
         ds_obc=system.ds_obc,
@@ -398,7 +384,11 @@ def test_solve(D0, bc_type, system):
 
         minfos = [
             newtils.NewtonModeInfo(
-                k=mode.k.real, s=1.0, re_array=mode.array.real, im_array=mode.array.imag
+                k=mode.k.real,
+                s=1.0,
+                re_array=mode.array.real,
+                im_array=mode.array.imag,
+                dof_at_maximum=mode.dof_at_maximum,
             )
         ]
 
@@ -511,20 +501,16 @@ def test_solve(D0, bc_type, system):
         if system.double_size:
             if modesel == 7:
                 assert last_newton_step.k0 == pytest.approx(9.455132713237349)
-                assert last_newton_step.s0 == pytest.approx(0.16124300209812095)
+                assert last_newton_step.s0 == pytest.approx(0.21664958093514616)
                 # TODO improve convergence
                 assert last_newton_step.corrnorm < 1e-10
             elif modesel == 8:
                 assert last_newton_step.k0 == pytest.approx(10.48029282556277)
-                assert last_newton_step.s0 == pytest.approx(0.41394226298297737)
+                assert last_newton_step.s0 == pytest.approx(0.5112783322774705)
                 # assert last_newton_step[2] < 1e-10
             elif modesel == 9:
                 assert last_newton_step.k0 == pytest.approx(11.527333)
-                # why is there a slight difference between the double_size
-                # system and the single size system (0.402264 vs 0.401229)???
-                # -> This is expected due to the slightly different grids (the
-                # normalization grid point (bcs_norm_constraint) is different)
-                assert last_newton_step.s0 == pytest.approx(0.402264)
+                assert last_newton_step.s0 == pytest.approx(0.49687456154420656)
                 assert last_newton_step.corrnorm < 1e-10
         elif bc_type == BCType.NBC:
             # TODO add some checks
@@ -532,10 +518,10 @@ def test_solve(D0, bc_type, system):
         else:
             if modesel == 4:
                 assert last_newton_step.k0 == pytest.approx(11.527333)
-                assert last_newton_step.s0 == pytest.approx(0.4012285749638693)
+                assert last_newton_step.s0 == pytest.approx(0.4968826337362412)
             elif modesel == 3:
                 assert last_newton_step.k0 == pytest.approx(9.45513271323724)
-                assert last_newton_step.s0 == pytest.approx(0.16160731606720716)
+                assert last_newton_step.s0 == pytest.approx(0.21664872927707485)
             assert last_newton_step.corrnorm < 1e-10
 
         assert len(refined_mode.newton_info_df) <= 6
@@ -581,7 +567,6 @@ def test_multimode_solve(D0, bc_type, system):
         N=None,
         Q=Q,
         R=R,
-        bcs_norm_constraint=system.bcs_norm_constraint,
     )
     modes = algorithms.get_nevp_modes(nevp_inputs, bcs=system.bcs)
 
@@ -589,7 +574,6 @@ def test_multimode_solve(D0, bc_type, system):
         system.V,
         system.ka,
         system.gt,
-        system.et,
         dielec=system.dielec,
         n=system.n,
         ds_obc=system.ds_obc,
@@ -618,8 +602,8 @@ def test_multimode_solve(D0, bc_type, system):
 
     assert info_df.iloc[-1].k0 == pytest.approx(1.14844e1)
     assert info_df.iloc[-1].k1 == pytest.approx(9.42298e0)
-    assert info_df.iloc[-1].s0 == pytest.approx(1.142e0, rel=1e-3)
-    assert info_df.iloc[-1].s1 == pytest.approx(6.308e-1, rel=1e-3)
+    assert info_df.iloc[-1].s0 == pytest.approx(1.393e0, rel=1e-3)
+    assert info_df.iloc[-1].s1 == pytest.approx(7.952e-1, rel=1e-3)
 
     assert len(info_df) == 5  # 5 iterations of the newton method
 
@@ -679,14 +663,12 @@ def test_intensity_vs_pump_esterhazy(bc_type, D0range, system):
         N=None,
         Q=Q,
         R=R,
-        bcs_norm_constraint=system.bcs_norm_constraint,
     )
 
     nlp = NonLinearProblem(
         system.V,
         system.ka,
         system.gt,
-        system.et,
         dielec=system.dielec,
         n=system.n,
         ds_obc=system.ds_obc,
@@ -723,6 +705,7 @@ def test_intensity_vs_pump_esterhazy(bc_type, D0range, system):
                     s=1.0,
                     re_array=mode.array.real,
                     im_array=mode.array.imag,
+                    dof_at_maximum=mode.dof_at_maximum,
                 )
             ]
 
@@ -786,12 +769,14 @@ def test_intensity_vs_pump_esterhazy(bc_type, D0range, system):
                         s=1.0,
                         re_array=refined_mode.array.real,
                         im_array=refined_mode.array.imag,
+                        dof_at_maximum=refined_mode.dof_at_maximum,
                     ),
                     newtils.NewtonModeInfo(
                         k=second_mode.k.real,
                         s=1.0,
                         re_array=second_mode.array.real,
                         im_array=second_mode.array.imag,
+                        dof_at_maximum=second_mode.dof_at_maximum,
                     ),
                 ]
 

@@ -16,6 +16,7 @@ class NewtonModeInfo:
     s: float
     re_array: np.ndarray
     im_array: np.ndarray
+    dof_at_maximum: int | None
 
     @property
     def cmplx_array(self):
@@ -81,6 +82,8 @@ def extract_newton_mode_infos(
             s=s,
             re_array=real_imag_array[:n],
             im_array=real_imag_array[n:],
+            # this has to be set by the caller
+            dof_at_maximum=None,
         )
         modeinfos.append(mi)
     return modeinfos
