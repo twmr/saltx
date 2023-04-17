@@ -36,12 +36,11 @@ whose value corresponds to the number of lobes (in radial direction) of the mode
 Note that it is possible that j > l, because their always exists an infinite number of
 pairs (l, j) for a given l.
 """
-import time
 import enum
+import time
 from collections import namedtuple
+from logging import getLogger
 from pathlib import Path
-from saltx.nonlasing import NonLasingLinearProblem
-from saltx.plot import plot_ellipse
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -53,12 +52,13 @@ from dolfinx import fem
 from dolfinx.io import XDMFFile
 from mpi4py import MPI
 from petsc4py import PETSc
-from saltx import algorithms
-from saltx.plot import plot_ciss_eigenvalues, plot_meshfunctions
-from saltx.pml import RectPML
 from ufl import curl, dx, elem_mult, inner
-from logging import getLogger
+
+from saltx import algorithms
 from saltx.log import Timer
+from saltx.nonlasing import NonLasingLinearProblem
+from saltx.plot import plot_ciss_eigenvalues, plot_ellipse, plot_meshfunctions
+from saltx.pml import RectPML
 
 repo_dir = Path(__file__).parent.parent.parent.parent.parent
 

@@ -13,7 +13,7 @@ from mpi4py import MPI
 from petsc4py import PETSc
 from ufl import dx, inner, nabla_grad
 
-from saltx import newtils, algorithms
+from saltx import algorithms, newtils
 from saltx.lasing import NonLinearProblem
 
 log = logging.getLogger(__name__)
@@ -64,11 +64,7 @@ def test_assemble_F_and_J():
     v = ufl.TestFunction(V)
 
     def assemble_form(form, diag=1.0):
-        mat = fem.petsc.assemble_matrix(
-            fem.form(form),
-            bcs=bcs,
-            diagonal=diag
-        )
+        mat = fem.petsc.assemble_matrix(fem.form(form), bcs=bcs, diagonal=diag)
         mat.assemble()
         return mat
 

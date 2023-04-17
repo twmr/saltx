@@ -22,7 +22,7 @@ from mpi4py import MPI
 from petsc4py import PETSc
 from ufl import dx, inner, nabla_grad
 
-from saltx import newtils, algorithms
+from saltx import algorithms, newtils
 from saltx.lasing import NonLinearProblem
 from saltx.plot import plot_ciss_eigenvalues
 

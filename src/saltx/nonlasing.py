@@ -5,6 +5,7 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 import operator
 from typing import Any
+
 import ufl
 from dolfinx import fem
 from dolfinx.fem.petsc import create_matrix, create_vector

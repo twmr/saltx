@@ -16,3 +16,17 @@ classifiers = [
 [project.urls]
 "Homepage" = "https://github.com/thisch/saltx"
 "Bug Tracker" = "https://github.com/thisch/saltx/issues"
+
+[tool.ruff]
+select = [
+    # Pyflakes
+    "F",
+    # Pycodestyle
+    "E",
+    "W",
+    # isort
+    "I001"
+]
+
+[tool.ruff.isort]
+known-first-party = ["saltx"]

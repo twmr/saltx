@@ -20,9 +20,9 @@ from dolfinx import fem
 from petsc4py import PETSc
 from ufl import ds, dx, inner, nabla_grad
 
-from saltx import newtils, algorithms
-from saltx.mesh import create_combined_interval_mesh, create_dcells
+from saltx import algorithms, newtils
 from saltx.lasing import NonLinearProblem
+from saltx.mesh import create_combined_interval_mesh, create_dcells
 from saltx.plot import plot_ciss_eigenvalues
 
 log = logging.getLogger(__name__)
@@ -208,10 +208,7 @@ def test_eval_traj(system):
     v = ufl.TestFunction(system.V)
 
     def assemble_form(form, diag=1.0):
-        mat = fem.petsc.assemble_matrix(
-            fem.form(form),
-            bcs=system.bcs,
-            diagonal=diag)
+        mat = fem.petsc.assemble_matrix(fem.form(form), bcs=system.bcs, diagonal=diag)
         mat.assemble()
         return mat
 
@@ -394,11 +391,7 @@ def test_solve(D0, system):
     v = ufl.TestFunction(system.V)
 
     def assemble_form(form, diag=1.0):
-        mat = fem.petsc.assemble_matrix(
-            fem.form(form),
-            bcs=system.bcs,
-            diagonal=diag
-        )
+        mat = fem.petsc.assemble_matrix(fem.form(form), bcs=system.bcs, diagonal=diag)
         mat.assemble()
         return mat
 
@@ -407,9 +400,7 @@ def test_solve(D0, system):
 
     L = assemble_form(-system.invperm * inner(nabla_grad(u), nabla_grad(v)) * dx)
     M = assemble_form(system.dielec * inner(u, v) * dx, diag=0.0)
-    Q = assemble_form(
-        to_const(D0) * system.pump_profile * inner(u, v) * dx, diag=0.0
-    )
+    Q = assemble_form(to_const(D0) * system.pump_profile * inner(u, v) * dx, diag=0.0)
     R = assemble_form(inner(u, v) * ds, diag=0.0)
 
     Print(
@@ -501,11 +492,7 @@ def test_intensity_vs_pump(system):
     v = ufl.TestFunction(system.V)
 
     def assemble_form(form, diag=1.0):
-        mat = fem.petsc.assemble_matrix(
-            fem.form(form),
-            bcs=system.bcs,
-            diagonal=diag
-        )
+        mat = fem.petsc.assemble_matrix(fem.form(form), bcs=system.bcs, diagonal=diag)
         mat.assemble()
         return mat
 
