@@ -509,12 +509,14 @@ def constant_pump_algorithm(
             return refined_modes
 
         minfos = [
+            # The modes have to be normalized
             newtils.NewtonModeInfo(
-                k=refined_mode.k,
+                k=mode.k,
                 s=s_init,
-                re_array=refined_mode.array.real,
-                im_array=refined_mode.array.imag,
+                re_array=mode.array.real,
+                im_array=mode.array.imag,
             )
-            for refined_mode in refined_modes
+            for mode in modes
+            if abs(mode.k.imag) < 1e-10
         ]
     raise RuntimeError("unreachable point reached")

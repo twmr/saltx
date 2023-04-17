@@ -627,8 +627,9 @@ def test_multimode_solve(D0, bc_type, system):
     assert info_df.iloc[-1].s0 == pytest.approx(1.142e0, rel=1e-3)
     assert info_df.iloc[-1].s1 == pytest.approx(6.308e-1, rel=1e-3)
 
-    assert len(info_df) == 6  # 6 iterations of the newton method
-    assert info_df.iloc[-1].corrnorm == pytest.approx(3.044e-11)
+    assert len(info_df) == 5  # 5 iterations of the newton method
+
+    assert info_df.iloc[-1].corrnorm < 1e-10
 
 
 @pytest.mark.parametrize(
