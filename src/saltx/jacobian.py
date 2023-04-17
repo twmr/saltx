@@ -63,7 +63,7 @@ def create_salt_jacobian_block_matrix(dF_dvw: PETSc.Mat, nmodes: int = 1) -> PET
     assert rows_ind.size == bottom_row_indices[0]
     for row_index in bottom_row_indices:
         final_rows_ind[row_index] = final_rows_ind[row_index - 1] + (
-            nmodes * len_et + diagonal_entry
+            len_et + diagonal_entry
         )
 
     # calculate cols
@@ -86,12 +86,14 @@ def create_salt_jacobian_block_matrix(dF_dvw: PETSc.Mat, nmodes: int = 1) -> PET
 
         prev_row_ind = rid
 
-    # last two rows:
+    # last two*nmodes rows:
     # f = Real(e^T (v+1jw) - 1) = e^T v - 1
     # g = Imag(e^T (v+1jw) - 1) = e^T w
-    # -> df_dv = dg_dw = e^T
-    # [df_dv, 0,     0, 0]
-    # [0,     dg_dw, 0, 0]
+    # -> dfx_dvx = dgx_dwx = ex^T  # x is the mode index
+    # [df1_dv1, 0,       0,       0,      | 0, 0, 0, 0]
+    # [0,       dg1_dw1, 0,       0,      | 0, 0, 0, 0]
+    # [0,       0,       df2_dv2, 0,      | 0, 0, 0, 0]
+    # [0,       0,       0,       dg2_dw2,| 0, 0, 0, 0]
 
     # TODO see above TODO comment
     # all_cols.append(np.r_[fixed_phase_dof, fixed_phase_dof + n])
@@ -111,18 +113,14 @@ def create_salt_jacobian_block_matrix(dF_dvw: PETSc.Mat, nmodes: int = 1) -> PET
         all_cols.append(
             np.r_[
                 np.arange(len_et, dtype=final_rows_ind.dtype),
-                np.arange(2 * len_et, 3 * len_et, dtype=final_rows_ind.dtype),
                 # diagonal entry
                 nm3 + 1,
                 np.arange(len_et, 2 * len_et, dtype=final_rows_ind.dtype),
-                np.arange(3 * len_et, 4 * len_et, dtype=final_rows_ind.dtype),
                 # diagonal entry
                 nm3 + 2,
-                np.arange(len_et, dtype=final_rows_ind.dtype),
                 np.arange(2 * len_et, 3 * len_et, dtype=final_rows_ind.dtype),
                 # previous last diagonal entry:
                 nm3 + 3,
-                np.arange(len_et, 2 * len_et, dtype=final_rows_ind.dtype),
                 np.arange(3 * len_et, 4 * len_et, dtype=final_rows_ind.dtype),
                 # last diagonal entry:
                 nm3 + 4,
