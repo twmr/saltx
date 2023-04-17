@@ -554,6 +554,84 @@ def test_solve(D0, bc_type, system):
 
 
 @pytest.mark.parametrize(
+    "D0, bc_type",
+    [
+        (0.56, BCType.DBC),
+    ],
+)
+def test_multimode_solve(D0, bc_type, system):
+    u = ufl.TrialFunction(system.V)
+    v = ufl.TestFunction(system.V)
+
+    def assemble_form(form, diag=1.0):
+        mat = fem.petsc.assemble_matrix(fem.form(form), bcs=system.bcs, diagonal=diag)
+        mat.assemble()
+        return mat
+
+    L = assemble_form(-inner(nabla_grad(u), nabla_grad(v)) * dx)
+    M = assemble_form(system.dielec * inner(u, v) * dx, diag=0.0)
+    Q = assemble_form(D0 * system.pump_profile * inner(u, v) * dx, diag=0.0)
+    R = assemble_form(inner(u, v) * system.ds_obc, diag=0.0)
+
+    Print(
+        f"{L.getSize()=},  DOF: {L.getInfo()['nz_used']}, MEM: {L.getInfo()['memory']}"
+    )
+
+    nevp_inputs = algorithms.NEVPInputs(
+        ka=system.ka,
+        gt=system.gt,
+        rg_params=system.rg_params,
+        L=L,
+        M=M,
+        N=None,
+        Q=Q,
+        R=R,
+        bcs_norm_constraint=system.bcs_norm_constraint,
+    )
+    modes = algorithms.get_nevp_modes(nevp_inputs, bcs=system.bcs)
+
+    nlp = NonLinearProblem(
+        system.V,
+        system.ka,
+        system.gt,
+        system.et,
+        dielec=system.dielec,
+        n=system.n,
+        use_real_jac=True,
+        ds_obc=system.ds_obc,
+    )
+    nlp.set_pump(D0)
+    newton_operators = newtils.create_multimode_solvers_and_matrices(nlp, max_nmodes=2)
+
+    def to_const(real_value):
+        return fem.Constant(system.V.mesh, complex(real_value, 0))
+
+    multi_modes = algorithms.constant_pump_algorithm(
+        modes,
+        nevp_inputs,
+        to_const(D0) * system.pump_profile,
+        nlp,
+        newton_operators,
+        to_const,
+        assemble_form,
+        system,
+        s_init=1.0,
+    )
+
+    assert len(multi_modes) == 2
+
+    info_df = multi_modes[0].newton_info_df
+
+    assert info_df.iloc[-1].k0 == pytest.approx(1.14844e1)
+    assert info_df.iloc[-1].k1 == pytest.approx(9.42298e0)
+    assert info_df.iloc[-1].s0 == pytest.approx(1.142e0, rel=1e-3)
+    assert info_df.iloc[-1].s1 == pytest.approx(6.308e-1, rel=1e-3)
+
+    assert len(info_df) == 6  # 6 iterations of the newton method
+    assert info_df.iloc[-1].corrnorm == pytest.approx(3.044e-11)
+
+
+@pytest.mark.parametrize(
     "bc_type, D0range",
     [
         (BCType.DBC, np.linspace(0.2668, 0.37, 5)),
