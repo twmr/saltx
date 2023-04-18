@@ -47,7 +47,7 @@ def gen(geo_fname):
 def main():
     gmsh.initialize()
 
-    for geo in ("circle_with_pml.geo", "quadrant_with_pml.geo"):
+    for geo in ("circle_with_pml.geo", "quarter_circle_with_pml.geo"):
         gen(geo)
 
         # Remember that by default, if physical groups are defined, Gmsh will export in

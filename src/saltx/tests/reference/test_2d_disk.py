@@ -157,7 +157,7 @@ def system():
     D0 = 0.17
     epsc = (1.2) ** 2
 
-    mshxdmf = "quadrant_with_pml0.xdmf"
+    mshxdmf = "quarter_circle_with_pml0.xdmf"
     # mshxdmf = "circle_with_pml0.xdmf"
 
     radius = 1.5 * gt
@@ -167,7 +167,7 @@ def system():
     del radius
     del vscale
 
-    is_quadrant = mshxdmf.startswith("quadrant")
+    is_quarter_circle = mshxdmf.startswith("quarter_circle")
     pxdmf = (repo_dir / "data" / "meshes" / mshxdmf).resolve()
 
     with XDMFFile(MPI.COMM_WORLD, pxdmf, "r") as fh:
@@ -209,8 +209,8 @@ def system():
         plot_meshfunctions(msh, pump_profile, dielec, invperm)
 
     X, Y = np.meshgrid(
-        np.linspace(0 if is_quadrant else -pml_end, pml_end, 8 * 32),
-        np.linspace(0 if is_quadrant else -pml_end, pml_end, 8 * 32),
+        np.linspace(0 if is_quarter_circle else -pml_end, pml_end, 8 * 32),
+        np.linspace(0 if is_quarter_circle else -pml_end, pml_end, 8 * 32),
     )
     points = np.vstack([X.flatten(), Y.flatten()])
     evaluator = algorithms.Evaluator(V, msh, points)
@@ -316,7 +316,7 @@ def test_check_eigenvalues(system):
 
 
 def test_eval_traj(system):
-    assert system.is_quadrant
+    assert system.is_quarter_circle
 
     # If set to True, determine one mode for a set of pump strengths D0 (D0range) using
     # a newton method, otherwise the full eigenvalue problem is solved for all pump
@@ -549,7 +549,7 @@ def solve_nevp_wrapper(
 
 
 def test_solve(system):
-    if system.is_quadrant:
+    if system.is_quarter_circle:
         # x=0 and y=0 are the boundaries at which we want to impose different BC
 
         def on_outer_boundary(x):
@@ -623,7 +623,7 @@ def test_solve(system):
         ax.axvline(x=-system.pml_start, c="w")
         phis = np.linspace(0, 2 * np.pi, 128)
         ax.plot(np.cos(phis), np.sin(phis), "w-")
-        if system.is_quadrant:
+        if system.is_quarter_circle:
             ax.set_xlim(0, system.pml_end)
             ax.set_ylim(0, system.pml_end)
 
@@ -743,7 +743,7 @@ def test_twomodes(system):
         ax.axvline(x=-system.pml_start, c="w")
         phis = np.linspace(0, 2 * np.pi, 128)
         ax.plot(np.cos(phis), np.sin(phis), "w-")
-        if system.is_quadrant:
+        if system.is_quarter_circle:
             ax.set_xlim(0, system.pml_end)
             ax.set_ylim(0, system.pml_end)
 
