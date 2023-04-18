@@ -327,7 +327,7 @@ def _refine_modes(
 ):
     nmodes = len(modeinfos)
     newtils.fill_vector_with_modeinfos(initial_x, modeinfos)
-    initial_dof_at_maximums = [minfo.dof_at_maximum for minfo in modeinfos]
+    initial_dof_at_maximum_seq = [minfo.dof_at_maximum for minfo in modeinfos]
 
     # TODO maybe we should call set bcs here in nlp:
     # nlp.bcs = mode.bcs (instead of passing the bcs to assemble_*)
@@ -369,7 +369,7 @@ def _refine_modes(
         minfos = newtils.extract_newton_mode_infos(
             initial_x, nmodes=nmodes, real_sanity_check=sanity_checks
         )
-        for minfo, dof_at_maximum in zip(minfos, initial_dof_at_maximums):
+        for minfo, dof_at_maximum in zip(minfos, initial_dof_at_maximum_seq):
             minfo.dof_at_maximum = dof_at_maximum
 
         cur_k, cur_s = [mi.k for mi in minfos], [mi.s for mi in minfos]

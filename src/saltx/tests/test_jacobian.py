@@ -336,12 +336,12 @@ def test_create_and_assemble_salt_jacobian(nmodes):
 
     n = V.dofmap.index_map.size_global
     assert n > 500
-    dof_at_maximums = [500] * nmodes
+    dof_at_maximum_seq = [500] * nmodes
     assemble_salt_jacobian_block_matrix(
         A,
         mat_dF_dvw,
         dFdk_seq,
         dFds_seq,
-        dof_at_maximums,
+        dof_at_maximum_seq,
         nmodes=nmodes,
     )

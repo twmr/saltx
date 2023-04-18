@@ -151,7 +151,7 @@ def assemble_salt_jacobian_block_matrix(
     dF_dvw: PETSc.Mat,
     dFReIm_dk_seq: list[PETSc.Vec],
     dFReIm_ds_seq: list[PETSc.Vec],
-    dof_at_maximums: list[int],
+    dof_at_maximum_seq: list[int],
     nmodes: int,
 ) -> None:
     """
@@ -170,7 +170,7 @@ def assemble_salt_jacobian_block_matrix(
     assert 2 * n * nmodes + 2 * nmodes == N
     assert len(dFReIm_ds_seq) == nmodes
     assert len(dFReIm_dk_seq) == nmodes
-    assert len(dof_at_maximums) == nmodes
+    assert len(dof_at_maximum_seq) == nmodes
 
     if False:  # for debugging
         fnamemap = dict(
@@ -235,7 +235,7 @@ def assemble_salt_jacobian_block_matrix(
 
     # row vectors
     # we have 2*nmodes additional row vectors
-    for midx, dof_at_maximum in enumerate(dof_at_maximums):
+    for midx, dof_at_maximum in enumerate(dof_at_maximum_seq):
         row_idx = 2 * n * nmodes + 2 * midx
         col_shift = 2 * n * midx
         A.setValue(row_idx, col_shift + dof_at_maximum, 1.0, addv=addv)
