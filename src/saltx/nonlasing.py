@@ -28,6 +28,7 @@ def ass_linear_form(form):
 def ass_linear_form_into_vec(vec, form):
     with vec.localForm() as vec_local:
         vec_local.set(0.0)
+    # TODO handle ghost-values??
     fem.petsc.assemble_vector(vec, fem.form(form))
     vec.assemble()
 
@@ -69,6 +70,11 @@ class NonLasingLinearProblem:
 
         # size of the fem matrices
         self.n = V.dofmap.index_map.size_global
+
+        # initialize PETSc vectors to avoid repeated allocation in every iteration of
+        # the Newton method.
+        self.vec_F_petsc = PETSc.Vec().createSeq(self.n)
+        self.b = fem.Function(self.V)
 
         self.dielec = dielec
         self.invperm = invperm or 1
@@ -124,10 +130,10 @@ class NonLasingLinearProblem:
             N = self.sigma_c * inner(u, ufl.conj(b)) * dx
             Sb += 1j * k * N
 
-        F_petsc = fem.petsc.assemble_vector(fem.form(Sb))
-
-        fem.set_bc(F_petsc, self.bcs)
-
+        F_petsc = self.vec_F_petsc
+        with Timer(print, "ass linear form F"):
+            ass_linear_form_into_vec(F_petsc, fem.form(Sb))
+            fem.set_bc(F_petsc, self.bcs)
         print(f"norm F_petsc {F_petsc.norm(0)}")
 
     def assemble_F_and_J(
@@ -142,7 +148,7 @@ class NonLasingLinearProblem:
 
         assert self.n + 1 == L.getSize()
 
-        b = fem.Function(self.V)
+        b = self.b
         b.x.array[:] = x.getValues(range(self.n))
         k = fem.Constant(self.V.mesh, x.getValue(self.n))
 
@@ -181,10 +187,10 @@ class NonLasingLinearProblem:
             N = self.sigma_c * inner(u, ufl.conj(b)) * dx
             Sb += 1j * k * N
 
-        F_petsc = fem.petsc.assemble_vector(fem.form(Sb))
-
-        fem.set_bc(F_petsc, self.bcs)
-
+        F_petsc = self.vec_F_petsc
+        with Timer(print, "ass linear form F"):
+            ass_linear_form_into_vec(F_petsc, fem.form(Sb))
+            fem.set_bc(F_petsc, self.bcs)
         print(f"norm F_petsc {F_petsc.norm(0)}")
 
         etbm1 = b.vector.getValue(dof_at_maximum) - 1
