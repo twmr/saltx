@@ -391,6 +391,14 @@ def test_eval_traj(system):
 
         solver = PETSc.KSP().create(system.msh.comm)
         solver.setOperators(nlA)
+
+        if False:
+
+            def monitor(ksp, its, rnorm):
+                print(f"{its}, {rnorm}")
+
+            solver.setMonitor(monitor)
+
         # Preconditioner (this has a huge impact on performance!!!)
         PC = solver.getPC()
         PC.setType("lu")
