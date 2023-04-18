@@ -176,7 +176,6 @@ def system():
 
     V = fem.FunctionSpace(msh, ("Lagrange", 4))
 
-    # MOVE these params to the fixture
     pml_start = 1.2
     pml_end = 1.8
 
