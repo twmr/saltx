@@ -371,9 +371,6 @@ def test_eval_traj(system):
         )
         modes = algorithms.get_nevp_modes(nevp_inputs, bcs=bcs["full_dbc"])
 
-        # TODO loop over more modes
-        initial_mode = modes[10]
-
         nllp = NonLasingLinearProblem(
             V=system.V,
             ka=system.ka,
@@ -404,73 +401,81 @@ def test_eval_traj(system):
         PC.setType("lu")
         PC.setFactorSolverType("mumps")
 
-        initial_x.setValues(range(system.n), initial_mode.array)
-        initial_x.setValue(system.n, initial_mode.k)
-        assert initial_x.getSize() == system.n + 1
-
     vals = []
-    for D0 in D0range:
-        log.info(f" {D0=} ".center(80, "#"))
+    max_iterations = 20
+
+    for midx in [10]:  # range(7,13):
         if use_newton:
-            log.error(f"Starting newton algorithm for mode @ k = {initial_mode.k}")
-            nllp.set_pump(to_const(D0) * system.pump_profile)
+            initial_mode = modes[midx]
 
-            max_iterations = 20
-            i = 0
+            initial_x.setValues(range(system.n), initial_mode.array)
+            initial_x.setValue(system.n, initial_mode.k)
+            assert initial_x.getSize() == system.n + 1
 
-            newton_steps = []
-            while i < max_iterations:
-                tstart = time.monotonic()
-                with Timer(Print, "assemble F vec and J matrix"):
-                    nllp.assemble_F_and_J(
-                        nlL, nlA, initial_x, initial_mode.dof_at_maximum
+        for D0 in D0range:
+            log.info(f" {D0=} ".center(80, "#"))
+            if use_newton:
+                log.error(f"Starting newton algorithm for mode @ k = {initial_mode.k}")
+                nllp.set_pump(to_const(D0) * system.pump_profile)
+
+                i = 0
+
+                newton_steps = []
+                while i < max_iterations:
+                    tstart = time.monotonic()
+                    with Timer(Print, "assemble F vec and J matrix"):
+                        nllp.assemble_F_and_J(
+                            nlL, nlA, initial_x, initial_mode.dof_at_maximum
+                        )
+                    nlL.ghostUpdate(
+                        addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE
                     )
-                nlL.ghostUpdate(
-                    addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE
+                    # Scale residual by -1
+                    nlL.scale(-1)
+                    nlL.ghostUpdate(
+                        addv=PETSc.InsertMode.INSERT_VALUES,
+                        mode=PETSc.ScatterMode.FORWARD,
+                    )
+
+                    with Timer(Print, "Solve KSP"):
+                        solver.solve(nlL, delta_x)
+
+                    relaxation_param = 1.0
+                    initial_x += relaxation_param * delta_x
+
+                    cur_k = initial_x.getValue(system.n)
+                    Print(f"DELTA k: {delta_x.getValue(system.n)}")
+
+                    i += 1
+
+                    # Compute norm of update
+                    correction_norm = delta_x.norm(0)
+
+                    newton_steps.append(
+                        (cur_k, correction_norm, time.monotonic() - tstart)
+                    )
+
+                    Print(f"----> Iteration {i}: Correction norm {correction_norm}")
+                    if correction_norm < 1e-10:
+                        break
+
+                if correction_norm > 1e-10:
+                    raise RuntimeError(f"mode at {initial_mode.k} didn't converge")
+
+                Print(f"Initial k: {initial_mode.k} ...")
+                df = pd.DataFrame(newton_steps, columns=["k", "corrnorm", "dt"])
+                vals.append(np.array([D0, cur_k]))
+                Print(df)
+
+                # use the current mode as an initial guess for the mode at the next D0
+                # -> we keep initial_x as is.
+            else:
+                nevp_inputs.Q = assemble_form(
+                    to_const(D0) * system.pump_profile * inner(u, v) * dx, diag=0.0
                 )
-                # Scale residual by -1
-                nlL.scale(-1)
-                nlL.ghostUpdate(
-                    addv=PETSc.InsertMode.INSERT_VALUES, mode=PETSc.ScatterMode.FORWARD
-                )
-
-                with Timer(Print, "Solve KSP"):
-                    solver.solve(nlL, delta_x)
-
-                relaxation_param = 1.0
-                initial_x += relaxation_param * delta_x
-
-                cur_k = initial_x.getValue(system.n)
-                Print(f"DELTA k: {delta_x.getValue(system.n)}")
-
-                i += 1
-
-                # Compute norm of update
-                correction_norm = delta_x.norm(0)
-
-                newton_steps.append((cur_k, correction_norm, time.monotonic() - tstart))
-
-                Print(f"----> Iteration {i}: Correction norm {correction_norm}")
-                if correction_norm < 1e-10:
-                    break
-
-            if correction_norm > 1e-10:
-                raise RuntimeError(f"mode at {initial_mode.k} didn't converge")
-
-            Print(f"Initial k: {initial_mode.k} ...")
-            df = pd.DataFrame(newton_steps, columns=["k", "corrnorm", "dt"])
-            vals.append(np.array([D0, cur_k]))
-            Print(df)
-
-            # use the current mode as an initial guess for the mode at the next D0
-            # -> we keep initial_x as is.
-        else:
-            nevp_inputs.Q = assemble_form(
-                to_const(D0) * system.pump_profile * inner(u, v) * dx, diag=0.0
-            )
-            modes = algorithms.get_nevp_modes(nevp_inputs, bcs=bcs["full_dbc"])
-        evals = np.asarray([mode.k for mode in modes])
-        vals.append(np.vstack([D0 * np.ones(evals.shape), evals]).T)
+                modes = algorithms.get_nevp_modes(nevp_inputs, bcs=bcs["full_dbc"])
+            evals = np.asarray([mode.k for mode in modes])
+            vals.append(np.vstack([D0 * np.ones(evals.shape), evals]).T)
 
     def scatter_plot(vals, title):
         fig, ax = plt.subplots()
