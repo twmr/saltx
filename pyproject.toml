@@ -17,6 +17,17 @@ classifiers = [
 "Homepage" = "https://github.com/thisch/saltx"
 "Bug Tracker" = "https://github.com/thisch/saltx/issues"
 
+[tool.pytest.ini_options]
+addopts = '''
+    --verbose
+    -rs
+    --color=yes
+    --log-level=DEBUG
+    --log-format="%(asctime)s.%(msecs)03d %(name)25.25s %(levelname)-8s %(message)s"
+    --log-date-format="%H:%M:%S"
+    --durations=100
+'''
+
 [tool.ruff]
 select = [
     # Pyflakes
