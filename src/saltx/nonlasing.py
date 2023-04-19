@@ -20,11 +20,12 @@ from .log import Timer
 log = logging.getLogger(__name__)
 
 
-def ass_linear_form_into_vec(vec, form):
+def ass_linear_form_into_vec(vec, form, bcs):
     with vec.localForm() as vec_local:
         vec_local.set(0.0)
     # TODO handle ghost-values??
     fem.petsc.assemble_vector(vec, form)
+    fem.set_bc(vec, bcs)
     vec.assemble()
 
 
@@ -134,8 +135,7 @@ class NonLasingLinearProblem:
 
         F_petsc = self.vec_F_petsc
         with Timer(print, "ass linear form F"):
-            ass_linear_form_into_vec(F_petsc, fem.form(Sb))
-            fem.set_bc(F_petsc, self.bcs)
+            ass_linear_form_into_vec(F_petsc, fem.form(Sb), self.bcs)
         print(f"norm F_petsc {F_petsc.norm(0)}")
 
     def assemble_F_and_J(
@@ -159,8 +159,7 @@ class NonLasingLinearProblem:
 
         F_petsc = self.vec_F_petsc
         with Timer(print, "ass linear form F"):
-            ass_linear_form_into_vec(F_petsc, self.form_Sb)
-            fem.set_bc(F_petsc, self.bcs)
+            ass_linear_form_into_vec(F_petsc, self.form_Sb, self.bcs)
         print(f"norm F_petsc {F_petsc.norm(0)}")
 
         etbm1 = b.vector.getValue(dof_at_maximum) - 1
@@ -181,8 +180,7 @@ class NonLasingLinearProblem:
             )
 
         with Timer(print, "ass linear form dF/dk"):
-            ass_linear_form_into_vec(self.vec_dF_dk, self.form_dFdk)
-            fem.set_bc(self.vec_dF_dk, self.bcs)
+            ass_linear_form_into_vec(self.vec_dF_dk, self.form_dFdk, self.bcs)
 
         jacobian.assemble_complex_singlemode_jacobian_matrix(
             A, self.mat_dF_du, self.vec_dF_dk, dof_at_maximum
