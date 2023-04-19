@@ -55,6 +55,7 @@ from petsc4py import PETSc
 from ufl import curl, dx, elem_mult, inner
 
 from saltx import algorithms, newtils
+from saltx.assemble import assemble_form
 from saltx.lasing import NonLinearProblem
 from saltx.log import Timer
 from saltx.nonlasing import NonLasingLinearProblem
@@ -66,6 +67,10 @@ repo_dir = Path(__file__).parent.parent.parent.parent.parent
 Print = PETSc.Sys.Print
 
 log = getLogger(__name__)
+
+
+def real_const(V, real_value: float) -> fem.Constant:
+    return fem.Constant(V.mesh, complex(real_value, 0))
 
 
 class BCType(enum.Enum):
@@ -339,15 +344,10 @@ def test_eval_traj(system):
     u = ufl.TrialFunction(system.V)
     v = ufl.TestFunction(system.V)
 
-    def assemble_form(form, diag=1.0):
-        mat = fem.petsc.assemble_matrix(
-            fem.form(form), bcs=bcs["full_dbc"], diagonal=diag
-        )
-        mat.assemble()
-        return mat
-
-    L = assemble_form(-inner(elem_mult(system.invperm, curl(u)), curl(v)) * dx)
-    M = assemble_form(system.dielec * inner(u, v) * dx, diag=0.0)
+    L = assemble_form(
+        -inner(elem_mult(system.invperm, curl(u)), curl(v)) * dx, bcs["full_dbc"]
+    )
+    M = assemble_form(system.dielec * inner(u, v) * dx, bcs["full_dbc"], diag=0.0)
 
     nevp_inputs = algorithms.NEVPInputs(
         ka=system.ka,
@@ -360,18 +360,17 @@ def test_eval_traj(system):
         R=None,
     )
 
-    def to_const(real_value):
-        return fem.Constant(system.V.mesh, complex(real_value, 0))
-
     D0range = np.linspace(0.05, 0.2, 32)
+    D0_constant = real_const(system.V, D0range[0])
 
     if use_newton:
         nevp_inputs.Q = assemble_form(
-            to_const(D0range[0]) * system.pump_profile * inner(u, v) * dx, diag=0.0
+            D0_constant * system.pump_profile * inner(u, v) * dx,
+            bcs["full_dbc"],
+            diag=0.0,
         )
         modes = algorithms.get_nevp_modes(nevp_inputs, bcs=bcs["full_dbc"])
 
-        D0_constant = to_const(1.0)
         nllp = NonLasingLinearProblem(
             V=system.V,
             ka=system.ka,
@@ -474,7 +473,9 @@ def test_eval_traj(system):
                 # -> we keep initial_x as is.
             else:
                 nevp_inputs.Q = assemble_form(
-                    to_const(D0) * system.pump_profile * inner(u, v) * dx, diag=0.0
+                    real_const(system.V, D0) * system.pump_profile * inner(u, v) * dx,
+                    bcs["full_dbc"],
+                    diag=0.0,
                 )
                 modes = algorithms.get_nevp_modes(nevp_inputs, bcs=bcs["full_dbc"])
             evals = np.asarray([mode.k for mode in modes])
@@ -532,16 +533,9 @@ def solve_nevp_wrapper(
         assert isinstance(local_bcs, list)
         Print(f"------------> Now solving modes with bcs={bcs_name}")
 
-        def assemble_form(form, diag=1.0):
-            mat = fem.petsc.assemble_matrix(
-                fem.form(form), bcs=local_bcs, diagonal=diag
-            )
-            mat.assemble()
-            return mat
-
-        L = assemble_form(-inner(elem_mult(invperm, curl(u)), curl(v)) * dx)
-        M = assemble_form(dielec * inner(u, v) * dx, diag=0.0)
-        Q = assemble_form(D0 * pump_profile * inner(u, v) * dx, diag=0.0)
+        L = assemble_form(-inner(elem_mult(invperm, curl(u)), curl(v)) * dx, local_bcs)
+        M = assemble_form(dielec * inner(u, v) * dx, local_bcs, diag=0.0)
+        Q = assemble_form(D0 * pump_profile * inner(u, v) * dx, local_bcs, diag=0.0)
 
         Print(
             f"{L.getSize()=},  DOF: {L.getInfo()['nz_used']}, MEM:"
@@ -690,20 +684,16 @@ def test_twomodes(system):
     u = ufl.TrialFunction(system.V)
     v = ufl.TestFunction(system.V)
 
-    def assemble_form(form, diag=1.0):
-        mat = fem.petsc.assemble_matrix(
-            fem.form(form), bcs=bcs["full_dbc"], diagonal=diag
-        )
-        mat.assemble()
-        return mat
+    D0_constant = real_const(system.V, system.D0)
 
-    def to_const(real_value):
-        return fem.Constant(system.V.mesh, complex(real_value, 0))
-
-    L = assemble_form(-inner(elem_mult(system.invperm, curl(u)), curl(v)) * dx)
-    M = assemble_form(system.dielec * inner(u, v) * dx, diag=0.0)
+    L = assemble_form(
+        -inner(elem_mult(system.invperm, curl(u)), curl(v)) * dx, bcs["full_dbc"]
+    )
+    M = assemble_form(system.dielec * inner(u, v) * dx, bcs["full_dbc"], diag=0.0)
     Q = assemble_form(
-        to_const(system.D0) * system.pump_profile * inner(u, v) * dx, diag=0.0
+        D0_constant * system.pump_profile * inner(u, v) * dx,
+        bcs["full_dbc"],
+        diag=0.0,
     )
 
     nevp_inputs = algorithms.NEVPInputs(
@@ -730,20 +720,16 @@ def test_twomodes(system):
         dielec=system.dielec,
         invperm=system.invperm,
         n=system.n,
+        pump=D0_constant * system.pump_profile,
         ds_obc=None,
     )
-    nlp.set_pump(to_const(system.D0) * system.pump_profile)
 
     newton_operators = newtils.create_multimode_solvers_and_matrices(nlp, max_nmodes=2)
     multi_modes = algorithms.constant_pump_algorithm(
         modes,
         nevp_inputs,
-        to_const(system.D0) * system.pump_profile,
         nlp,
         newton_operators,
-        to_const,
-        assemble_form,
-        system,
         s_init=1.0,
         # TODO What is needed to improve the accuracy of the eigenvalues of 2D
         # eigenmodes when mode(s) are included in the hole burning term?

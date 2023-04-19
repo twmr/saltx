@@ -17,12 +17,14 @@ import numpy as np
 import pytest
 import ufl
 from dolfinx import fem, mesh
+from dolfinx.fem.petsc import create_matrix
 from dolfinx.mesh import locate_entities_boundary, meshtags
 from mpi4py import MPI
 from petsc4py import PETSc
 from ufl import dx, inner, nabla_grad
 
 from saltx import algorithms, newtils
+from saltx.assemble import assemble_form
 from saltx.lasing import NonLinearProblem
 from saltx.plot import plot_ciss_eigenvalues
 
@@ -35,6 +37,10 @@ class BCType(enum.Enum):
     NONE = enum.auto()  # Length = 2,
     DBC = enum.auto()  # Length = 1 with DBC at x=0
     NBC = enum.auto()  # Length = 1 with NBC at x=0
+
+
+def real_const(V, real_value: float) -> fem.Constant:
+    return fem.Constant(V.mesh, complex(real_value, 0))
 
 
 def determine_meshtags_for_1d(msh):
@@ -145,16 +151,14 @@ def test_eval_traj(bc_type, system, first_threshold):
     u = ufl.TrialFunction(system.V)
     v = ufl.TestFunction(system.V)
 
-    def assemble_form(form, diag=1.0):
-        mat = fem.petsc.assemble_matrix(fem.form(form), bcs=system.bcs, diagonal=diag)
-        mat.assemble()
-        return mat
+    D0_constant = real_const(system.V, 1.0)
 
     log.info("Before first assembly")
-    L = assemble_form(-inner(nabla_grad(u), nabla_grad(v)) * dx)
-    M = assemble_form(system.dielec * inner(u, v) * dx, diag=0.0)
-    R = assemble_form(inner(u, v) * system.ds_obc, diag=0.0)
-
+    L = assemble_form(-inner(nabla_grad(u), nabla_grad(v)) * dx, system.bcs)
+    M = assemble_form(system.dielec * inner(u, v) * dx, system.bcs, diag=0.0)
+    R = assemble_form(inner(u, v) * system.ds_obc, system.bcs, diag=0.0)
+    Q_form = fem.form(D0_constant * system.pump_profile * inner(u, v) * dx)
+    Q = create_matrix(Q_form)
     nevp_inputs = algorithms.NEVPInputs(
         ka=system.ka,
         gt=system.gt,
@@ -162,12 +166,9 @@ def test_eval_traj(bc_type, system, first_threshold):
         L=L,
         M=M,
         N=None,
-        Q=None,
+        Q=Q,
         R=R,
     )
-
-    def to_const(real_value):
-        return fem.Constant(system.V.mesh, complex(real_value, 0))
 
     if refine_first_mode:
         nlp = NonLinearProblem(
@@ -176,9 +177,9 @@ def test_eval_traj(bc_type, system, first_threshold):
             system.gt,
             dielec=system.dielec,
             n=system.n,
+            pump=D0_constant * system.pump_profile,
             ds_obc=system.ds_obc,
         )
-        nlp.set_pump(to_const(1.0) * system.pump_profile)
         newton_operators = newtils.create_multimode_solvers_and_matrices(
             nlp, max_nmodes=1
         )
@@ -187,16 +188,13 @@ def test_eval_traj(bc_type, system, first_threshold):
     vals_after_refine = []
     for D0 in D0range:
         log.info(f" {D0=} ".center(80, "#"))
-        nevp_inputs.Q = assemble_form(
-            to_const(D0) * system.pump_profile * inner(u, v) * dx, diag=0.0
-        )
+        D0_constant.value = D0
+        assemble_form(Q_form, system.bcs, diag=0.0, mat=nevp_inputs.Q)
 
         modes = algorithms.get_nevp_modes(nevp_inputs, bcs=system.bcs)
         evals = np.asarray([mode.k for mode in modes])
 
         if refine_first_mode:
-            nlp.set_pump(to_const(D0) * system.pump_profile)
-
             mode = modes[evals.imag.argmax()]  # k ~ 11 mode
             assert 11.0 < mode.k.real < 12.0
 
@@ -223,25 +221,12 @@ def test_eval_traj(bc_type, system, first_threshold):
 
             assert refined_mode.converged
 
-            # now we solve again the NEVP with CISS, but with a real_mode_sht
-            # in the SHT
-            k_sht = fem.Constant(system.msh, complex(refined_mode.k, 0))
-            b_sht = fem.Function(system.V)
-            # this includes the scaling term s, so we don't have to multiply it
-            b_sht.x.array[:] = refined_mode.array
+            # solve again the NEVP with CISS, but with a single mode in the hole burning
+            # term.
+            nlp.update_b_and_k_for_forms([refined_mode])
 
-            # update sht term
-            gk_sht = system.gt / (k_sht - system.ka + 1j * system.gt)
             Q_with_sht = fem.petsc.assemble_matrix(
-                fem.form(
-                    D0
-                    * system.pump_profile
-                    / (1 + abs(gk_sht * b_sht) ** 2)
-                    * inner(u, v)
-                    * dx
-                ),
-                bcs=system.bcs,
-                diagonal=PETSc.ScalarType(0),
+                nlp.get_Q_hbt_form(nmodes=1), bcs=system.bcs, diagonal=0.0
             )
             Q_with_sht.assemble()
 
@@ -321,20 +306,14 @@ def test_eval_traj(bc_type, system, first_threshold):
 def test_solve(D0, bc_type, system):
     u = ufl.TrialFunction(system.V)
     v = ufl.TestFunction(system.V)
+    D0_constant = real_const(system.V, D0)
 
-    def assemble_form(form, diag=1.0):
-        mat = fem.petsc.assemble_matrix(fem.form(form), bcs=system.bcs, diagonal=diag)
-        mat.assemble()
-        return mat
-
-    L = assemble_form(-inner(nabla_grad(u), nabla_grad(v)) * dx)
-    M = assemble_form(system.dielec * inner(u, v) * dx, diag=0.0)
-    Q = assemble_form(D0 * system.pump_profile * inner(u, v) * dx, diag=0.0)
-    R = assemble_form(inner(u, v) * system.ds_obc, diag=0.0)
-
-    Print(
-        f"{L.getSize()=},  DOF: {L.getInfo()['nz_used']}, MEM: {L.getInfo()['memory']}"
+    L = assemble_form(-inner(nabla_grad(u), nabla_grad(v)) * dx, system.bcs)
+    M = assemble_form(system.dielec * inner(u, v) * dx, system.bcs, diag=0.0)
+    Q = assemble_form(
+        D0_constant * system.pump_profile * inner(u, v) * dx, system.bcs, diag=0.0
     )
+    R = assemble_form(inner(u, v) * system.ds_obc, system.bcs, diag=0.0)
 
     nevp_inputs = algorithms.NEVPInputs(
         ka=system.ka,
@@ -356,9 +335,9 @@ def test_solve(D0, bc_type, system):
         system.gt,
         dielec=system.dielec,
         n=system.n,
+        pump=D0_constant * system.pump_profile,
         ds_obc=system.ds_obc,
     )
-    nlp.set_pump(D0)
     newton_operators = newtils.create_multimode_solvers_and_matrices(nlp, max_nmodes=1)
 
     modeselectors = []
@@ -418,28 +397,18 @@ def test_solve(D0, bc_type, system):
             continue
 
         if D0 in (0.37, 0.38):
-            # check_refined_mode()
-            # now we solve again the NEVP with CISS, but with a real_mode_sht in the SHT
-            k_sht = fem.Constant(system.msh, complex(refined_mode.k, 0))
-            b_sht = fem.Function(system.V)
-            b_sht.x.array[:] = refined_mode.array
+            # solve again the NEVP with CISS, but with a single mode in the hole burning
+            # term.
+            nlp.update_b_and_k_for_forms([refined_mode])
 
-            # update sht term
-            gk_sht = system.gt / (k_sht - system.ka + 1j * system.gt)
             Q_with_sht = fem.petsc.assemble_matrix(
-                fem.form(
-                    D0
-                    * system.pump_profile
-                    / (1 + abs(gk_sht * b_sht) ** 2)
-                    * inner(u, v)
-                    * dx
-                ),
-                bcs=system.bcs,
-                diagonal=PETSc.ScalarType(0),
+                nlp.get_Q_hbt_form(nmodes=1), bcs=system.bcs, diagonal=0.0
             )
             Q_with_sht.assemble()
 
-            sht_modes = algorithms.get_nevp_modes(nevp_inputs, custom_Q=Q_with_sht)
+            sht_modes = algorithms.get_nevp_modes(
+                nevp_inputs, custom_Q=Q_with_sht, bcs=system.bcs
+            )
 
             imag_evals = np.asarray([m.k.imag for m in sht_modes])
             number_of_modes_close_to_real_axis = np.sum(np.abs(imag_evals) < 1e-10)
@@ -544,19 +513,14 @@ def test_multimode_solve(D0, bc_type, system):
     u = ufl.TrialFunction(system.V)
     v = ufl.TestFunction(system.V)
 
-    def assemble_form(form, diag=1.0):
-        mat = fem.petsc.assemble_matrix(fem.form(form), bcs=system.bcs, diagonal=diag)
-        mat.assemble()
-        return mat
+    D0_constant = real_const(system.V, D0)
 
-    L = assemble_form(-inner(nabla_grad(u), nabla_grad(v)) * dx)
-    M = assemble_form(system.dielec * inner(u, v) * dx, diag=0.0)
-    Q = assemble_form(D0 * system.pump_profile * inner(u, v) * dx, diag=0.0)
-    R = assemble_form(inner(u, v) * system.ds_obc, diag=0.0)
-
-    Print(
-        f"{L.getSize()=},  DOF: {L.getInfo()['nz_used']}, MEM: {L.getInfo()['memory']}"
+    L = assemble_form(-inner(nabla_grad(u), nabla_grad(v)) * dx, system.bcs)
+    M = assemble_form(system.dielec * inner(u, v) * dx, system.bcs, diag=0.0)
+    Q = assemble_form(
+        D0_constant * system.pump_profile * inner(u, v) * dx, system.bcs, diag=0.0
     )
+    R = assemble_form(inner(u, v) * system.ds_obc, system.bcs, diag=0.0)
 
     nevp_inputs = algorithms.NEVPInputs(
         ka=system.ka,
@@ -576,23 +540,16 @@ def test_multimode_solve(D0, bc_type, system):
         system.gt,
         dielec=system.dielec,
         n=system.n,
+        pump=D0_constant * system.pump_profile,
         ds_obc=system.ds_obc,
     )
-    nlp.set_pump(D0)
     newton_operators = newtils.create_multimode_solvers_and_matrices(nlp, max_nmodes=2)
-
-    def to_const(real_value):
-        return fem.Constant(system.V.mesh, complex(real_value, 0))
 
     multi_modes = algorithms.constant_pump_algorithm(
         modes,
         nevp_inputs,
-        to_const(D0) * system.pump_profile,
         nlp,
         newton_operators,
-        to_const,
-        assemble_form,
-        system,
         s_init=1.0,
     )
 
@@ -635,19 +592,14 @@ def test_intensity_vs_pump_esterhazy(bc_type, D0range, system):
     u = ufl.TrialFunction(system.V)
     v = ufl.TestFunction(system.V)
 
-    def assemble_form(form, diag=1.0):
-        mat = fem.petsc.assemble_matrix(
-            fem.form(form),
-            bcs=system.bcs,
-            diagonal=diag,
-        )
-        mat.assemble()
-        return mat
+    D0_constant = real_const(system.V, 1.0)
 
-    L = assemble_form(-inner(nabla_grad(u), nabla_grad(v)) * dx)
-    M = assemble_form(system.dielec * inner(u, v) * dx, diag=0.0)
-    Q = assemble_form(system.pump_profile * inner(u, v) * dx, diag=0.0)
-    R = assemble_form(inner(u, v) * system.ds_obc, diag=0.0)
+    L = assemble_form(-inner(nabla_grad(u), nabla_grad(v)) * dx, system.bcs)
+    M = assemble_form(system.dielec * inner(u, v) * dx, system.bcs, diag=0.0)
+    Q = assemble_form(
+        D0_constant * system.pump_profile * inner(u, v) * dx, system.bcs, diag=0.0
+    )
+    R = assemble_form(inner(u, v) * system.ds_obc, system.bcs, diag=0.0)
 
     Print(
         f"(complex-valued) NEVP: {L.getSize()=},  DOF: {L.getInfo()['nz_used']}, "
@@ -671,6 +623,7 @@ def test_intensity_vs_pump_esterhazy(bc_type, D0range, system):
         system.gt,
         dielec=system.dielec,
         n=system.n,
+        pump=D0_constant * system.pump_profile,
         ds_obc=system.ds_obc,
     )
 
@@ -684,14 +637,16 @@ def test_intensity_vs_pump_esterhazy(bc_type, D0range, system):
 
     for D0 in D0range:
         Print(f" {D0=} ".center(80, "#"))
-        nevp_inputs.Q = assemble_form(
-            D0 * system.pump_profile * inner(u, v) * dx, diag=0.0
+        D0_constant.value = D0
+        assemble_form(
+            D0_constant * system.pump_profile * inner(u, v) * dx,
+            system.bcs,
+            diag=0.0,
+            mat=nevp_inputs.Q,
         )
         modes = algorithms.get_nevp_modes(nevp_inputs, bcs=system.bcs)
         evals = np.asarray([mode.k for mode in modes])
         assert evals.size
-
-        nlp.set_pump(D0)
 
         if False:
             # we only care about the mode with the highest imag value because otherwise
@@ -722,25 +677,12 @@ def test_intensity_vs_pump_esterhazy(bc_type, D0range, system):
 
             assert refined_mode.converged
 
-            # now we solve again the NEVP with CISS, but with a real_mode_sht
-            # in the SHT
-            k_sht = fem.Constant(system.msh, complex(refined_mode.k, 0))
-            b_sht = fem.Function(system.V)
-            # this includes the scaling term s, so we don't have to multiply it
-            b_sht.x.array[:] = refined_mode.array
+            # solve again the NEVP with CISS, but with a single mode in the hole burning
+            # term.
+            nlp.update_b_and_k_for_forms([refined_mode])
 
-            # update sht term
-            gk_sht = system.gt / (k_sht - system.ka + 1j * system.gt)
             Q_with_sht = fem.petsc.assemble_matrix(
-                fem.form(
-                    D0
-                    * system.pump_profile
-                    / (1 + abs(gk_sht * b_sht) ** 2)
-                    * inner(u, v)
-                    * dx
-                ),
-                bcs=system.bcs,
-                diagonal=PETSc.ScalarType(0),
+                nlp.get_Q_hbt_form(nmodes=1), bcs=system.bcs, diagonal=0.0
             )
             Q_with_sht.assemble()
 
@@ -801,12 +743,8 @@ def test_intensity_vs_pump_esterhazy(bc_type, D0range, system):
             multi_modes = algorithms.constant_pump_algorithm(
                 modes,
                 nevp_inputs,
-                D0 * system.pump_profile,
                 nlp,
                 newton_operators,
-                to_const,
-                assemble_form,
-                system,
             )
             multi_evals = np.asarray([mode.k for mode in multi_modes])
             number_of_modes_close_to_real_axis = np.sum(

@@ -39,6 +39,7 @@ class NonLinearProblem:
         gt,
         dielec: float | fem.Function,
         n: int,
+        pump,
         invperm: fem.Function | None = None,
         ds_obc=None,  # only needed for 1D
         max_nmodes=5,
@@ -52,8 +53,10 @@ class NonLinearProblem:
         self.dielec = dielec
         self.invperm = invperm or 1
 
-        # is set later by set_pump
-        self.pump = None
+        # in most cases pump is D0 * pump_profile, but can also be more
+        # generalized expressions (see the pump profile in the exceptional
+        # point system)
+        self.pump = pump
 
         # dielectric loss of the cold (not-pumped) cavity
         self.sigma_c = None
@@ -72,46 +75,60 @@ class NonLinearProblem:
             (fem.Constant(self.mesh, 0j), fem.Constant(self.mesh, 0j))
             for _ in range(max_nmodes)
         ]
+        self._max_spaces = [(self.V.clone(), self.V.clone()) for _ in range(max_nmodes)]
+        self._k_hbt_constants = [
+            # k_hbt (k is real valued)
+            fem.Constant(self.mesh, complex(1.0, 0.0))
+            for _ in range(max_nmodes)
+        ]
+        self._cur_forms = {}
+        self._cur_Q_hbt_forms = {}
 
         topo_dim = V.mesh.topology.dim
         self._mult = elem_mult if topo_dim > 1 else operator.mul
         self._curl = ufl.curl if topo_dim > 1 else nabla_grad
 
-    def set_pump(self, pump: float | fem.Function):
-        # in most cases pump is D0 * pump_profile, but can also be more
-        # generalized expressions (see the pump profile in the exceptional
-        # point system)
-        self.pump = pump
+    def update_b_and_k_for_forms(self, refined_modes) -> None:
+        assert len(refined_modes) <= len(self._b_vectors)
 
-    def assemble_F_and_J(self, L, A, minfos, bcs):
-        # assemble F(minfos) into the vector L
-        # assemble J(minfos) into the matrix A
+        for refined_mode, b, k in zip(
+            refined_modes, self._b_vectors, self._k_hbt_constants
+        ):
+            b.x.array[:] = refined_mode.array
+            k.value = refined_mode.k
 
-        # Reset the residual vector
-        with L.localForm() as L_local:
-            L_local.set(0.0)
+    def get_Q_hbt_form(self, nmodes: int) -> fem.forms.FormMetaClass:
+        try:
+            return self._cur_Q_hbt_forms[nmodes]
+        except KeyError:
+            Q_hbt_form = self._create_Q_hbt_form(nmodes)
+            self._cur_Q_hbt_forms[Q_hbt_form] = Q_hbt_form
+            return Q_hbt_form
 
-        # N = A.getSize()[0]
-        # assert N == A.getSize()[1]
-        assert A.getSize()[0] == L.getSize()
+    def _create_Q_hbt_form(self, nmodes: int) -> fem.forms.FormMetaClass:
+        u = ufl.TrialFunction(self.V)
+        v = ufl.TestFunction(self.V)
 
-        n = self.n
+        ka = self.ka
+        gt = self.gt
+        sht = 0
+        for midx, (b, k) in enumerate(zip(self._b_vectors, self._k_hbt_constants)):
+            if midx == nmodes:
+                break
+            gk = gt / (k - ka + 1j * gt)
+            sht += abs(gk * b) ** 2
+        qform = fem.form(self.pump / (1 + sht) * inner(u, v) * dx)
+        return qform
 
-        # TODO create this in __init__
-        spaces = [(self.V.clone(), self.V.clone()) for _ in minfos]
+    def _create_newton_forms(self, nmodes):
+        spaces = self._max_spaces[:nmodes]
 
-        nmodes = len(minfos)
         modes_data = []
-        for minfo, b, (k, s) in zip(minfos, self._b_vectors, self._form_constants):
-            b.x.array[:] = minfo.cmplx_array
-            k.value = complex(minfo.k, 0)
-            s.value = complex(minfo.s, 0)
-            modes_data.append((b, k, s, minfo.dof_at_maximum))
+        for midx, (b, (k, s)) in enumerate(zip(self._b_vectors, self._form_constants)):
+            if midx == nmodes:
+                break
+            modes_data.append((b, k, s))
         del b, k, s
-
-        log.info(
-            f"eval F and J at k={[m.k for m in minfos]}, s={[m.s for m in minfos]}"
-        )
 
         pump = self.pump
         assert pump is not None
@@ -133,10 +150,12 @@ class NonLinearProblem:
         def dGk_dk(k):
             return -2 * (k - ka) / ((k - ka) ** 2 + gt**2) * Gk(k)  # p. 116
 
-        sht = sum(Gk(k) * s**2 * abs(b) ** 2 for (b, k, s, _) in modes_data)
+        sht = sum(Gk(k) * s**2 * abs(b) ** 2 for (b, k, s) in modes_data)
 
         curl = self._curl
         mult = self._mult
+
+        F_components = []
 
         def Lre(testf, trialf):
             return inner(mult(ufl.real(invp), curl(trialf)), curl(testf)) * dx
@@ -464,21 +483,6 @@ class NonLinearProblem:
             a_form_array[offy + 1, offx] = dFIm_dv
             a_form_array[offy + 1, offx + 1] = dFIm_dw
 
-        F_components = []
-        etbm1s = []
-
-        bcscalar = PETSc.ScalarType(0)
-        bcdofs_seq = [bc.dof_indices()[0] for bc in bcs]
-        # we have to add the same BC for the subspaces self.Ws, because this is required
-        # for the block_matrix_assembly
-        # TODO rename new_bcs to just bcs
-        new_bcs = [
-            fem.dirichletbc(bcscalar, bcdofs, W)
-            for bcdofs in bcdofs_seq
-            for spacetuple in spaces
-            for W in spacetuple
-        ]
-
         log.debug("create form array objects")
         a_form_array = np.array(
             [[None for _ in range(2 * nmodes)] for _ in range(2 * nmodes)], dtype=object
@@ -486,18 +490,13 @@ class NonLinearProblem:
         dF_dk_seq, dF_ds_seq = [], []
         # product loop for filling the a_form_array with forms
         for mode_row_index, (
-            (b_row, k_row, s_row, dof_at_maximum),
+            (b_row, k_row, s_row),
             (Wre_row, Wim_row),
         ) in enumerate(zip(modes_data, spaces)):
             calc_Fre_and_Fim(b_row, k_row, Wre_row, Wim_row)
 
-            etbm1 = b_row.vector.getValue(dof_at_maximum) - 1
-            if abs(etbm1) > 1e-12:
-                log.debug(f"{etbm1=}")
-            etbm1s.extend([etbm1.real, etbm1.imag])
-
             for mode_col_index, (
-                (b_col, k_col, s_col, _),
+                (b_col, k_col, s_col),
                 (Wre_col, Wim_col),
             ) in enumerate(zip(modes_data, spaces)):
                 if mode_row_index == mode_col_index:
@@ -522,12 +521,12 @@ class NonLinearProblem:
 
         # column vectors (vec_F_petsc, vec_dF_ds_seq, vec_dF_dk_seq)
         for mode_col_index, (
-            (b_col, k_col, s_col, _),
+            (b_col, k_col, s_col),
             (Wre_col, Wim_col),
         ) in enumerate(zip(modes_data, spaces)):
             local_dF_dk_column, local_dF_ds_column = [], []
             for mode_row_index, (
-                (b_row, k_row, s_row, _),
+                (b_row, k_row, s_row),
                 (Wre_row, Wim_row),
             ) in enumerate(zip(modes_data, spaces)):
                 if mode_col_index == mode_row_index:
@@ -559,12 +558,74 @@ class NonLinearProblem:
             dF_dk_seq.append(local_dF_dk_column)
             dF_ds_seq.append(local_dF_ds_column)
 
-        log.debug("Calling fem.form(F)")
-        F_components = fem.form(F_components)
-        log.debug("Calling fem.form(a)")
-        a_form_array = fem.form(a_form_array)
-
+        with Timer(log.debug, "Calling fem.form(F)"):
+            F_components = fem.form(F_components)
+        with Timer(log.debug, "Calling fem.form(a)"):
+            a_form_array = fem.form(a_form_array)
+        with Timer(log.debug, "Creating fem.form s for dF/dk dF/ds"):
+            dF_dk_seq = fem.form([x for x in dF_dk_seq])
+            dF_ds_seq = fem.form([x for x in dF_ds_seq])
         log.debug("create form array objects done")
+
+        return F_components, a_form_array, dF_dk_seq, dF_ds_seq
+
+    def get_forms(self, nmodes):
+        try:
+            return self._cur_forms[nmodes]
+        except KeyError:
+            cur_forms = self._create_newton_forms(nmodes)
+            self._cur_forms[nmodes] = cur_forms
+            return cur_forms
+
+    def assemble_F_and_J(self, L, A, minfos, bcs):
+        # assemble F(minfos) into the vector L
+        # assemble J(minfos) into the matrix A
+
+        # Reset the residual vector
+        with L.localForm() as L_local:
+            L_local.set(0.0)
+
+        # N = A.getSize()[0]
+        # assert N == A.getSize()[1]
+        assert A.getSize()[0] == L.getSize()
+
+        n = self.n
+
+        nmodes = len(minfos)
+        modes_data = []
+        for minfo, b, (k, s) in zip(minfos, self._b_vectors, self._form_constants):
+            b.x.array[:] = minfo.cmplx_array
+            k.value = complex(minfo.k, 0)
+            s.value = complex(minfo.s, 0)
+            modes_data.append((b, k, s, minfo.dof_at_maximum))
+        del b, k, s
+
+        log.info(
+            f"eval F and J at k={[m.k for m in minfos]}, s={[m.s for m in minfos]}"
+        )
+
+        etbm1s = []
+
+        bcscalar = PETSc.ScalarType(0)
+        bcdofs_seq = [bc.dof_indices()[0] for bc in bcs]
+        # we have to add the same BC for the subspaces self.Ws, because this is required
+        # for the block_matrix_assembly
+        # TODO rename new_bcs to just bcs
+        new_bcs = [
+            fem.dirichletbc(bcscalar, bcdofs, W)
+            for bcdofs in bcdofs_seq
+            for spacetuple in self._max_spaces[:nmodes]
+            for W in spacetuple
+        ]
+
+        for b_row, _, _, dof_at_maximum in modes_data:
+            etbm1 = b_row.vector.getValue(dof_at_maximum) - 1
+            if abs(etbm1) > 1e-12:
+                log.debug(f"{etbm1=}")
+            etbm1s.extend([etbm1.real, etbm1.imag])
+
+        # TODO create this in __init__
+        F_components, a_form_array, dF_dk_seq, dF_ds_seq = self.get_forms(nmodes)
 
         try:
             matvec_coll = self.matvec_coll_map[nmodes]
@@ -576,14 +637,10 @@ class NonLinearProblem:
 
                 vec_F_petsc = create_vector_block(F_components)
                 log.debug("AFTER CVB")
-                vec_dF_dk_seq = [
-                    create_vector_block(fem.form(dF_dk)) for dF_dk in dF_dk_seq
-                ]
+                vec_dF_dk_seq = [create_vector_block(dF_dk) for dF_dk in dF_dk_seq]
                 log.debug("AFTER CVB (dF_dk_seq)")
 
-                vec_dF_ds_seq = [
-                    create_vector_block(fem.form(dF_ds)) for dF_ds in dF_ds_seq
-                ]
+                vec_dF_ds_seq = [create_vector_block(dF_ds) for dF_ds in dF_ds_seq]
                 log.debug("AFTER CVB (dF_ds_seq)")
                 matvec_coll = MatVecCollection(
                     mat_dF_dvw=mat_dF_dvw,

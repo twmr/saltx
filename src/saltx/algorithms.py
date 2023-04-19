@@ -12,11 +12,9 @@ import typing
 
 import numpy as np
 import pandas as pd
-import ufl
 from dolfinx import fem, geometry
 from petsc4py import PETSc
 from slepc4py import SLEPc
-from ufl import dx, inner
 
 from saltx import newtils
 from saltx.log import Timer
@@ -438,25 +436,15 @@ def _refine_modes(
 def constant_pump_algorithm(
     nevp_modes: list[NEVPNonLasingMode],
     nevp_inputs: NEVPInputs,
-    pump_expr,
     nlp: NonLinearProblem,
     newton_operators: dict[int, newtils.NewtonMatricesAndSolver],
-    to_const: callable,
-    assemble_form: callable,
-    system,  # container for system related parameters
     s_init: float = 1.0,
     first_mode_index: int | None = None,
     real_axis_threshold=1e-10,
 ):
-    u = ufl.TrialFunction(system.V)
-    v = ufl.TestFunction(system.V)
-
     modes = nevp_modes
     evals = np.asarray([mode.k for mode in modes])
     minfos = []
-
-    ka = to_const(system.ka)
-    gt = to_const(system.gt)
 
     for i in range(len(nevp_modes)):
         # I think this criterion is not good enough for the 1D slab system used in the
@@ -466,6 +454,8 @@ def constant_pump_algorithm(
         if mode.k.imag < -1e-10 and i == 0:
             # no mode above threshold found
             return []
+
+        nmodes = i + 1
 
         if first_mode_index is not None and i == 0:
             mode = modes[first_mode_index]
@@ -492,21 +482,18 @@ def constant_pump_algorithm(
         )
         assert all(rm.converged for rm in refined_modes)
 
-        sht = 0
-        for refined_mode in refined_modes:
-            k_sht = to_const(refined_mode.k)
-            b_sht = fem.Function(system.V)
-            b_sht.x.array[:] = refined_mode.array
-            gk_sht = gt / (k_sht - ka + 1j * gt)
-            sht += abs(gk_sht * b_sht) ** 2
-
         log.debug(f"Before assembly of Q with custom sht (nmodes:{len(refined_modes)})")
-        Q_with_sht = assemble_form(
-            pump_expr / (1 + sht) * inner(u, v) * dx,
-            diag=0.0,
+        # this modifies the Q matrix in nevp_inputs
+        nlp.update_b_and_k_for_forms(refined_modes)
+        Q = nevp_inputs.Q
+        Q.zeroEntries()
+        fem.petsc.assemble_matrix(
+            Q, nlp.get_Q_hbt_form(nmodes), bcs=mode.bcs, diagonal=0.0
         )
+        Q.assemble()
         log.debug("After assembly of Q with custom sht")
-        modes = get_nevp_modes(nevp_inputs, custom_Q=Q_with_sht, bcs=mode.bcs)
+
+        modes = get_nevp_modes(nevp_inputs, bcs=mode.bcs)
         evals = np.asarray([mode.k for mode in modes])
 
         number_of_modes_close_to_real_axis = np.sum(

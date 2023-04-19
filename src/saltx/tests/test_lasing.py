@@ -58,6 +58,10 @@ def test_assemble_F_and_J():
         mat.assemble()
         return mat
 
+    def to_const(real_value: float) -> fem.Constant:
+        return fem.Constant(V.mesh, complex(real_value, 0))
+
+    D0 = to_const(D0)
     L = assemble_form(-inner(nabla_grad(u), nabla_grad(v)) * dx)
     M = assemble_form(dielec * inner(u, v) * dx, diag=0.0)
     Q = assemble_form(D0 * pump_profile * inner(u, v) * dx, diag=0.0)
@@ -88,9 +92,9 @@ def test_assemble_F_and_J():
         gt,
         dielec=dielec,
         n=n,
+        pump=D0,
         ds_obc=ds_obc,
     )
-    nlp.set_pump(D0)
     nlA = nlp.create_A()
     nlL = nlp.create_L()
     initial_x = nlp.create_dx()
