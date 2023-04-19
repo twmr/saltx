@@ -404,6 +404,7 @@ def test_eval_traj(system):
     vals = []
     max_iterations = 20
 
+    t0 = time.monotonic()
     for midx in [10]:  # range(7,13):
         if use_newton:
             initial_mode = modes[midx]
@@ -476,6 +477,12 @@ def test_eval_traj(system):
                 modes = algorithms.get_nevp_modes(nevp_inputs, bcs=bcs["full_dbc"])
             evals = np.asarray([mode.k for mode in modes])
             vals.append(np.vstack([D0 * np.ones(evals.shape), evals]).T)
+
+    t_total = time.monotonic() - t0
+    log.info(
+        f"The eval trajectory code ({D0range.size} D0 steps) took"
+        f"{t_total:.1f}s (avg per iteration: {t_total/D0range.size:.3f}s)"
+    )
 
     def scatter_plot(vals, title):
         fig, ax = plt.subplots()
