@@ -106,7 +106,7 @@ class NonLasingLinearProblem:
         b = fem.Function(self.V)
         b.x.array[:] = x.getValues(range(self.n))
         k = fem.Constant(self.V.mesh, x.getValue(self.n))
-        print(f"eval F at k={k._cpp_object.value}")
+        print(f"eval F at k={k.value}")
 
         pump = self.pump
         dielec = self.dielec
@@ -153,9 +153,9 @@ class NonLasingLinearProblem:
         b = self.b
         b.x.array[:] = x.getValues(range(self.n))
         k = self.k_constant
-        k._cpp_object.value[...] = x.getValue(self.n)
+        k.value = x.getValue(self.n)
 
-        print(f"eval F at k={k._cpp_object.value}")
+        print(f"eval F at k={k.value}")
 
         F_petsc = self.vec_F_petsc
         with Timer(print, "ass linear form F"):

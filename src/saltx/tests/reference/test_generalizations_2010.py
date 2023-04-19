@@ -644,7 +644,7 @@ def test_intensity_vs_pump(system):
             aevals.append(multi_evals)
 
     _, ax = plt.subplots()
-    x = np.asarray([D0._cpp_object.value for (D0, _, _) in results])
+    x = np.asarray([D0.value for (D0, _, _) in results])
     y = np.asarray([intens for (_, _, intens) in results])
     ax.plot(
         x,

@@ -419,7 +419,7 @@ def test_eval_traj(system):
             log.info(f" {D0=} ".center(80, "#"))
             if use_newton:
                 log.error(f"Starting newton algorithm for mode @ k = {initial_mode.k}")
-                D0_constant._cpp_object.value[...] = D0
+                D0_constant.value = D0
 
                 i = 0
 
