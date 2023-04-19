@@ -65,6 +65,14 @@ class NonLinearProblem:
 
         self.matvec_coll_map: dict[int, MatVecCollection] = {}
 
+        # TODO do this lazily
+        self._b_vectors = [fem.Function(V) for _ in range(max_nmodes)]
+        self._form_constants = [
+            # k, s
+            (fem.Constant(self.mesh, 0j), fem.Constant(self.mesh, 0j))
+            for _ in range(max_nmodes)
+        ]
+
         topo_dim = V.mesh.topology.dim
         self._mult = elem_mult if topo_dim > 1 else operator.mul
         self._curl = ufl.curl if topo_dim > 1 else nabla_grad
@@ -94,11 +102,10 @@ class NonLinearProblem:
 
         nmodes = len(minfos)
         modes_data = []
-        for minfo in minfos:
-            b = fem.Function(self.V)
+        for minfo, b, (k, s) in zip(minfos, self._b_vectors, self._form_constants):
             b.x.array[:] = minfo.cmplx_array
-            k = fem.Constant(self.mesh, complex(minfo.k, 0))
-            s = fem.Constant(self.mesh, complex(minfo.s, 0))
+            k.value = complex(minfo.k, 0)
+            s.value = complex(minfo.s, 0)
             modes_data.append((b, k, s, minfo.dof_at_maximum))
         del b, k, s
 
