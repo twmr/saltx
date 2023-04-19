@@ -371,12 +371,14 @@ def test_eval_traj(system):
         )
         modes = algorithms.get_nevp_modes(nevp_inputs, bcs=bcs["full_dbc"])
 
+        D0_constant = to_const(1.0)
         nllp = NonLasingLinearProblem(
             V=system.V,
             ka=system.ka,
             gt=system.gt,
             dielec=system.dielec,
             invperm=system.invperm,
+            pump=D0_constant * system.pump_profile,
             bcs=bcs["full_dbc"],
             ds_obc=None,
         )
@@ -417,7 +419,7 @@ def test_eval_traj(system):
             log.info(f" {D0=} ".center(80, "#"))
             if use_newton:
                 log.error(f"Starting newton algorithm for mode @ k = {initial_mode.k}")
-                nllp.set_pump(to_const(D0) * system.pump_profile)
+                D0_constant._cpp_object.value[...] = D0
 
                 i = 0
 

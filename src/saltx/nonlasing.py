@@ -3,6 +3,7 @@
 # This file is part of saltx (https://github.com/thisch/saltx)
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
+import logging
 import operator
 from typing import Any
 
@@ -16,20 +17,14 @@ from ufl import dx, elem_mult, inner, nabla_grad
 from . import jacobian
 from .log import Timer
 
-
-def ass_deriv(form, var):
-    return fem.petsc.assemble_matrix(fem.form(ufl.derivative(form, var)))
-
-
-def ass_linear_form(form):
-    return fem.petsc.assemble_vector(fem.form(form))
+log = logging.getLogger(__name__)
 
 
 def ass_linear_form_into_vec(vec, form):
     with vec.localForm() as vec_local:
         vec_local.set(0.0)
     # TODO handle ghost-values??
-    fem.petsc.assemble_vector(vec, fem.form(form))
+    fem.petsc.assemble_vector(vec, form)
     vec.assemble()
 
 
@@ -38,7 +33,7 @@ def ass_bilinear_form(mat, form, bcs, diagonal):
 
     fem.petsc.assemble_matrix(
         mat,
-        fem.form(form),
+        form,
         bcs=bcs,
         diagonal=diagonal,
     )
@@ -58,13 +53,25 @@ class NonLasingLinearProblem:
         V,
         ka,
         gt,
+        # FIXME the type hints are wrong
         dielec: float | fem.Function,
         invperm: fem.Function | None,
+        pump: float | fem.Function,
         bcs,
         # TODO what is the type of ufl.ds?
         ds_obc: Any | None,
     ):
         self.V = V
+
+        # this constant will be updated in assemble_F_and_J
+        self.k_constant = fem.Constant(self.V.mesh, complex(1.0, 0))
+        # The initial guess b will also be updated in assemble_F_and_J
+        self.b = fem.Function(self.V)
+
+        self.form_Sb: fem.forms.FormMetaClass
+        self.form_dFdk: fem.forms.FormMetaClass
+        self.form_dFdu: fem.forms.FormMetaClass
+
         self.ka = ka
         self.gt = gt
 
@@ -74,11 +81,10 @@ class NonLasingLinearProblem:
         # initialize PETSc vectors to avoid repeated allocation in every iteration of
         # the Newton method.
         self.vec_F_petsc = PETSc.Vec().createSeq(self.n)
-        self.b = fem.Function(self.V)
 
         self.dielec = dielec
         self.invperm = invperm or 1
-        self.pump = None
+        self.pump = pump
 
         # dielectric loss of the cold (not-pumped) cavity
         self.sigma_c = None
@@ -94,11 +100,8 @@ class NonLasingLinearProblem:
         self._mult = elem_mult if topo_dim > 1 else operator.mul
         self._curl = ufl.curl if topo_dim > 1 else nabla_grad
 
-    def set_pump(self, pump: float | fem.Function):
-        # in most cases pump is D0 * pump_profile, but can also be more
-        # generalized expressions (see the pump profile in the exceptional
-        # point system)
-        self.pump = pump
+        with Timer(log.debug, "Create fem forms"):
+            self.create_forms()
 
     def _demo_check_solutions(self, x: PETSc.Vec) -> None:
         b = fem.Function(self.V)
@@ -150,16 +153,8 @@ class NonLasingLinearProblem:
 
         b = self.b
         b.x.array[:] = x.getValues(range(self.n))
-        k = fem.Constant(self.V.mesh, x.getValue(self.n))
-
-        pump = self.pump
-        dielec = self.dielec
-        invperm = self.invperm
-        ka = self.ka
-        gt = self.gt
-
-        curl = self._curl
-        mult = self._mult
+        k = self.k_constant
+        k._cpp_object.value[...] = x.getValue(self.n)
 
         if self.bcs:
             # FIXME - generalize this
@@ -172,24 +167,9 @@ class NonLasingLinearProblem:
         else:
             print(f"eval F at k={k._cpp_object.value}")
 
-        gammak = gt / (k - ka + 1j * gt)
-
-        u = ufl.TrialFunction(self.V)
-        formL = inner(mult(invperm, curl(u)), curl(ufl.conj(b))) * dx
-        M = dielec * inner(u, ufl.conj(b)) * dx
-        Q = pump * inner(u, ufl.conj(b)) * dx
-
-        Sb = -formL + k**2 * M + k**2 * gammak * Q
-        if self.ds_obc is not None:
-            R = inner(u, ufl.conj(b)) * self.ds_obc
-            Sb += 1j * k * R
-        if self.sigma_c is not None:
-            N = self.sigma_c * inner(u, ufl.conj(b)) * dx
-            Sb += 1j * k * N
-
         F_petsc = self.vec_F_petsc
         with Timer(print, "ass linear form F"):
-            ass_linear_form_into_vec(F_petsc, fem.form(Sb))
+            ass_linear_form_into_vec(F_petsc, self.form_Sb)
             fem.set_bc(F_petsc, self.bcs)
         print(f"norm F_petsc {F_petsc.norm(0)}")
 
@@ -205,7 +185,57 @@ class NonLasingLinearProblem:
 
         print(f"current norm of F: {L.norm(0)}")
 
-        ####################
+        if self.mat_dF_du is None or self.vec_dF_dk is None:
+            # TODO maybe this could be done in __int__ of this class
+            with Timer(print, "creation of spare J matrices"):
+                if self.mat_dF_du is None:
+                    self.mat_dF_du = create_matrix(self.form_dFdu)
+
+                if self.vec_dF_dk is None:
+                    self.vec_dF_dk = create_vector(self.form_dFdk)
+
+        with Timer(print, "ass bilinear form dF/du"):
+            ass_bilinear_form(
+                self.mat_dF_du, self.form_dFdu, bcs=self.bcs, diagonal=1.0
+            )
+
+        with Timer(print, "ass linear form dF/dk"):
+            ass_linear_form_into_vec(self.vec_dF_dk, self.form_dFdk)
+            fem.set_bc(self.vec_dF_dk, self.bcs)
+
+        jacobian.assemble_complex_singlemode_jacobian_matrix(
+            A, self.mat_dF_du, self.vec_dF_dk, dof_at_maximum
+        )
+
+    def create_forms(self):
+        pump = self.pump
+        dielec = self.dielec
+        invperm = self.invperm
+        ka = self.ka
+        gt = self.gt
+
+        curl = self._curl
+        mult = self._mult
+
+        b = self.b
+        k = self.k_constant
+
+        gammak = gt / (k - ka + 1j * gt)
+
+        u = ufl.TrialFunction(self.V)
+        formL = inner(mult(invperm, curl(u)), curl(ufl.conj(b))) * dx
+        M = dielec * inner(u, ufl.conj(b)) * dx
+        Q = pump * inner(u, ufl.conj(b)) * dx
+
+        Sb = -formL + k**2 * M + k**2 * gammak * Q
+        if self.ds_obc is not None:
+            R = inner(u, ufl.conj(b)) * self.ds_obc
+            Sb += 1j * k * R
+        if self.sigma_c is not None:
+            N = self.sigma_c * inner(u, ufl.conj(b)) * dx
+            Sb += 1j * k * N
+        with Timer(print, "fem.form(Sb)"):
+            self.form_Sb = fem.form(Sb)
 
         v = ufl.TestFunction(self.V)
 
@@ -236,24 +266,8 @@ class NonLasingLinearProblem:
             N = self.sigma_c * inner(u, v) * dx
             dFdu += 1j * k * N
 
-        if self.mat_dF_du is None or self.vec_dF_dk is None:
-            with Timer(print, "creation of spare J matrices"):
-                if self.mat_dF_du is None:
-                    self.mat_dF_du = create_matrix(fem.form(dFdu))
-
-                if self.vec_dF_dk is None:
-                    self.vec_dF_dk = create_vector(fem.form(dFdk))
-
-        with Timer(print, "ass bilinear form dF/du"):
-            ass_bilinear_form(self.mat_dF_du, dFdu, bcs=self.bcs, diagonal=1.0)
-
-        with Timer(print, "ass linear form dF/dk"):
-            ass_linear_form_into_vec(self.vec_dF_dk, dFdk)
-            fem.set_bc(self.vec_dF_dk, self.bcs)
-
-        jacobian.assemble_complex_singlemode_jacobian_matrix(
-            A, self.mat_dF_du, self.vec_dF_dk, dof_at_maximum
-        )
+        self.form_dFdk = fem.form(dFdk)
+        self.form_dFdu = fem.form(dFdu)
 
     def create_A(self, n_fem):
         A = PETSc.Mat().create(MPI.COMM_WORLD)
