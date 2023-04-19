@@ -423,7 +423,7 @@ def test_eval_traj(system):
                 newton_steps = []
                 while i < max_iterations:
                     tstart = time.monotonic()
-                    with Timer(Print, "assemble F vec and J matrix"):
+                    with Timer(log.info, "assemble F vec and J matrix"):
                         nllp.assemble_F_and_J(
                             nlL, nlA, initial_x, initial_mode.dof_at_maximum
                         )

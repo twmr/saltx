@@ -3,6 +3,7 @@
 # This file is part of saltx (https://github.com/thisch/saltx)
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
+import logging
 import time
 
 import numpy as np
@@ -10,6 +11,8 @@ from mpi4py import MPI
 from petsc4py import PETSc
 
 from .log import Timer
+
+log = logging.getLogger(__name__)
 
 
 def create_salt_jacobian_block_matrix(dF_dvw: PETSc.Mat, nmodes: int = 1) -> PETSc.Mat:
@@ -146,6 +149,11 @@ def create_salt_jacobian_block_matrix(dF_dvw: PETSc.Mat, nmodes: int = 1) -> PET
     return A
 
 
+def _elapsed(start: float) -> str:
+    # returns elapsed time in milliseconds
+    return f"{(time.monotonic()-start)*1e3:.1f}"
+
+
 def assemble_salt_jacobian_block_matrix(
     A: PETSc.Mat,
     dF_dvw: PETSc.Mat,
@@ -186,10 +194,13 @@ def assemble_salt_jacobian_block_matrix(
         raise ValueError("END")
 
     def insert_values(target_matrix, block_matrix, row_offset, col_offset):
+        t_getcsr = time.monotonic()
         rows_ind, cols, values = block_matrix.getValuesCSR()
+        log.debug(f"getValuesCSR call took {_elapsed(t_getcsr)}ms")
 
         cols_to = cols + col_offset
 
+        t_rows_ind = time.monotonic()
         rows_ind_to = np.empty(
             N + 1, dtype=np.int32
         )  # +1 because rows_ind_to[0] is always 0
@@ -200,16 +211,16 @@ def assemble_salt_jacobian_block_matrix(
         _idx = _idx + len(rows_ind)
         rows_ind_to[_idx:] = len(values)
 
+        log.debug(f"rows_ind code took {_elapsed(t_rows_ind)}ms")
+
         t_setCSR_0 = time.monotonic()
         target_matrix.setValuesCSR(
             rows_ind_to, cols_to, values, addv=PETSc.InsertMode.ADD
         )
-        print(f"single setValuesCSR call took {time.monotonic()-t_setCSR_0:.2f}s")
+        log.debug(f"setValuesCSR call took {_elapsed(t_setCSR_0)}ms")
 
-    t_insert_0 = time.monotonic()
     # matrix, row offset, col offset
     insert_values(A, dF_dvw, 0, 0)
-    print(f"insert values of J took {time.monotonic()-t_insert_0:.2e}s")
 
     addv = PETSc.InsertMode.ADD
 
@@ -241,8 +252,6 @@ def assemble_salt_jacobian_block_matrix(
         A.setValue(row_idx, col_shift + dof_at_maximum, 1.0, addv=addv)
         A.setValue(row_idx + 1, col_shift + n + dof_at_maximum, 1.0, addv=addv)
 
-    print(f"insert values + J.setValues of J took {time.monotonic()-t_insert_0:.2e}s")
-
     # scalars
     # this is needed s.t. PETSc doesn't
     # complain that the diagonal entry is missing
@@ -253,9 +262,8 @@ def assemble_salt_jacobian_block_matrix(
 
     t1 = time.monotonic()
     A.assemble()
-    print(
-        f"fill+assembly of real J took {time.monotonic()-t0:.2e}s "
-        f"(assemble {time.monotonic()-t1:.2e}s)"
+    log.debug(
+        f"fill+assembly of real J took {_elapsed(t0)}ms (assemble {_elapsed(t1)}ms)"
     )
 
 
@@ -309,7 +317,7 @@ def assemble_complex_singlemode_jacobian_matrix(
 
     t1 = time.monotonic()
     A.assemble()
-    print(
-        f"fill+assembly of complex J took {time.monotonic()-t0:.2e}s "
-        f"(assemble {time.monotonic()-t1:.2e}s)"
+    log.debug(
+        f"fill+assembly of complex J took {_elapsed(t0)}ms "
+        f"(assemble {_elapsed(t1)}ms)"
     )

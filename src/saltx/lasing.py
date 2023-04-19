@@ -102,7 +102,9 @@ class NonLinearProblem:
             modes_data.append((b, k, s, minfo.dof_at_maximum))
         del b, k, s
 
-        print(f"eval F and J at k={[m.k for m in minfos]}, s={[m.s for m in minfos]}")
+        log.info(
+            f"eval F and J at k={[m.k for m in minfos]}, s={[m.s for m in minfos]}"
+        )
 
         pump = self.pump
         assert pump is not None
@@ -484,7 +486,7 @@ class NonLinearProblem:
 
             etbm1 = b_row.vector.getValue(dof_at_maximum) - 1
             if abs(etbm1) > 1e-12:
-                print(f"{etbm1=}")
+                log.debug(f"{etbm1=}")
             etbm1s.extend([etbm1.real, etbm1.imag])
 
             for mode_col_index, (
@@ -560,7 +562,7 @@ class NonLinearProblem:
         try:
             matvec_coll = self.matvec_coll_map[nmodes]
         except KeyError:
-            with Timer(print, "creation of sparse dF_dvw matrix and vectors"):
+            with Timer(log.debug, "creation of sparse dF_dvw matrix and vectors"):
                 log.debug("BEFORE CMB")
                 mat_dF_dvw = create_matrix_block(a_form_array)
                 log.debug("AFTER CMB")
@@ -591,7 +593,7 @@ class NonLinearProblem:
             matvec_coll.vec_F_petsc, F_components, a_form_array, bcs=new_bcs
         )
 
-        # print(f"norm F_petsc {F_petsc.norm(0)}")
+        # log.debug(f"norm F_petsc {F_petsc.norm(0)}")
         # S b = L.sub(0)
         # e^T b - 1 = L.sub(1)
 
@@ -599,12 +601,12 @@ class NonLinearProblem:
         L.setValues(range(2 * nmodes * n), f_vals.real)
         L.setValues(range(2 * nmodes * n, 2 * nmodes * (n + 1)), np.asarray(etbm1s))
 
-        print(f"current norm of F: {L.norm(0)}")
+        log.info(f"current norm of F: {L.norm(0)}")
 
         # 1 x n
 
-        with Timer(print, "ass bilinear forms"):
-            mat_dF_dvw = matvec_coll.mat_dF_dvw
+        mat_dF_dvw = matvec_coll.mat_dF_dvw
+        with Timer(log.debug, f"ass bilinear forms {mat_dF_dvw.getSize()=}"):
             mat_dF_dvw.zeroEntries()  # not sure if this is really needed
             fem.petsc.assemble_matrix_block(
                 mat_dF_dvw,
@@ -613,7 +615,7 @@ class NonLinearProblem:
             )
             mat_dF_dvw.assemble()
 
-        with Timer(print, "ass linear forms"):
+        with Timer(log.debug, "ass linear forms"):
             vec_dk_seq = matvec_coll.vec_dF_dk_seq
             vec_ds_seq = matvec_coll.vec_dF_ds_seq
             for i, (dF_dk, dF_ds) in enumerate(zip(dF_dk_seq, dF_ds_seq)):
@@ -633,7 +635,7 @@ class NonLinearProblem:
                     vec, fem.form(dF_ds), a_form_array, bcs=new_bcs
                 )
 
-        with Timer(print, "create real matrix"):
+        with Timer(log.debug, "Assembly of Jacobian into block real matrix"):
             jacobian.assemble_salt_jacobian_block_matrix(
                 A,
                 # for two modes:
@@ -662,7 +664,7 @@ class NonLinearProblem:
             ]
         )
 
-        with Timer(print, "create_A"):
+        with Timer(log.debug, "create_A"):
             block_mat = create_matrix_block(form_array)
 
             block_mat.zeroEntries()  # not sure if this is really needed
@@ -675,7 +677,7 @@ class NonLinearProblem:
             )
             block_mat.assemble()
 
-            with Timer(print, "create_salt_jacobian"):
+            with Timer(log.debug, "create_salt_jacobian"):
                 A = jacobian.create_salt_jacobian_block_matrix(
                     block_mat,
                     nmodes=nmodes,
