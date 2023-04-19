@@ -78,10 +78,6 @@ class NonLasingLinearProblem:
         # size of the fem matrices
         self.n = V.dofmap.index_map.size_global
 
-        # initialize PETSc vectors to avoid repeated allocation in every iteration of
-        # the Newton method.
-        self.vec_F_petsc = PETSc.Vec().createSeq(self.n)
-
         self.dielec = dielec
         self.invperm = invperm or 1
         self.pump = pump
@@ -92,16 +88,19 @@ class NonLasingLinearProblem:
         self.bcs = bcs
         self.ds_obc = ds_obc
 
-        # for J computation
-        self.mat_dF_du = None
-        self.vec_dF_dk = None
-
         topo_dim = V.mesh.topology.dim
         self._mult = elem_mult if topo_dim > 1 else operator.mul
         self._curl = ufl.curl if topo_dim > 1 else nabla_grad
 
         with Timer(log.debug, "Create fem forms"):
             self.create_forms()
+
+        # initialize PETSc vectors to avoid repeated allocation in every iteration of
+        # the Newton method.
+        with Timer(print, "Create initial matrix/vectors for J & F"):
+            self.vec_F_petsc = create_vector(self.form_Sb)
+            self.mat_dF_du = create_matrix(self.form_dFdu)
+            self.vec_dF_dk = create_vector(self.form_dFdk)
 
     def _demo_check_solutions(self, x: PETSc.Vec) -> None:
         b = fem.Function(self.V)
@@ -175,15 +174,6 @@ class NonLasingLinearProblem:
         L.setValue(self.n, etbm1)
 
         print(f"current norm of F: {L.norm(0)}")
-
-        if self.mat_dF_du is None or self.vec_dF_dk is None:
-            # TODO maybe this could be done in __int__ of this class
-            with Timer(print, "creation of spare J matrices"):
-                if self.mat_dF_du is None:
-                    self.mat_dF_du = create_matrix(self.form_dFdu)
-
-                if self.vec_dF_dk is None:
-                    self.vec_dF_dk = create_vector(self.form_dFdk)
 
         with Timer(print, "ass bilinear form dF/du"):
             ass_bilinear_form(
