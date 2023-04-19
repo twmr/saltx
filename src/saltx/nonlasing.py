@@ -156,16 +156,7 @@ class NonLasingLinearProblem:
         k = self.k_constant
         k._cpp_object.value[...] = x.getValue(self.n)
 
-        if self.bcs:
-            # FIXME - generalize this
-            dirichlet_fem_dof = 0
-            print(
-                f"eval F at k={k._cpp_object.value}, "
-                f"b[{dirichlet_fem_dof}]={b.x.array[dirichlet_fem_dof]}"
-            )
-            # TODO b must always have b[bcs[0]] = 0!
-        else:
-            print(f"eval F at k={k._cpp_object.value}")
+        print(f"eval F at k={k._cpp_object.value}")
 
         F_petsc = self.vec_F_petsc
         with Timer(print, "ass linear form F"):
