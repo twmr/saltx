@@ -3,6 +3,8 @@ import logging
 import matplotlib
 
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
+# doesn't work because ffcx changes the log-level at runtime, which is not good.
+logging.getLogger("ffcx").setLevel(logging.INFO)
 
 
 def pytest_addoption(parser):
