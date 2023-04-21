@@ -13,6 +13,7 @@ import typing
 import numpy as np
 import pandas as pd
 from dolfinx import fem, geometry
+from dolfinx.fem import DirichletBCMetaClass
 from petsc4py import PETSc
 from slepc4py import SLEPc
 
@@ -68,6 +69,7 @@ class NEVPInputs:
     # D0)
     Q: PETSc.Mat
     R: PETSc.Mat | None  # can only be used for 1D systems
+    bcs: list[DirichletBCMetaClass]
 
 
 class Evaluator:
@@ -117,9 +119,7 @@ class Evaluator:
 
 def get_nevp_modes(
     nevp_inputs: NEVPInputs,
-    custom_Q=None,
-    bcs_name="default",
-    bcs=None,
+    bcs_name: str = "default",
 ) -> list[NEVPNonLasingMode]:
     """Calculate the non-linear eigenmodes using a CISS solver.
 
@@ -161,11 +161,8 @@ def get_nevp_modes(
     # Setup the solver
     nep = SLEPc.NEP().create()
 
-    if custom_Q is None:
-        custom_Q = Q
-
-    operators = [L, M, custom_Q, R] if custom_Q else [L, M, R]
-    fractions = [f1, f2, f3, f4] if custom_Q else [f1, f2, f4]
+    operators = [L, M, Q, R] if Q else [L, M, R]
+    fractions = [f1, f2, f3, f4] if Q else [f1, f2, f4]
     if R is None and N is None:
         operators = operators[:-1]
         fractions = fractions[:-1]
@@ -242,7 +239,7 @@ def get_nevp_modes(
                 k=_lam,
                 error=res,
                 bcs_name=bcs_name,
-                bcs=bcs or [],
+                bcs=nevp_inputs.bcs or [],
                 dof_at_maximum=dof_at_maximum,
             )
         )
@@ -493,7 +490,7 @@ def constant_pump_algorithm(
         Q.assemble()
         log.debug("After assembly of Q with custom sht")
 
-        modes = get_nevp_modes(nevp_inputs, bcs=mode.bcs)
+        modes = get_nevp_modes(nevp_inputs)
         evals = np.asarray([mode.k for mode in modes])
 
         number_of_modes_close_to_real_axis = np.sum(

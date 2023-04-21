@@ -87,7 +87,7 @@ class RectPML:
         )
 
         sx = np.where(
-            abs(x[0, cond_pml]) >= self.pml_start - epsilon, 1 + self.alpha, 1
+            abs(x[0, cond_pml]) >= self.pml_start - epsilon, 1.0 + self.alpha, 1.0
         )
         sy = np.where(
             abs(x[1, cond_pml]) >= self.pml_start - epsilon, 1 + self.alpha, 1

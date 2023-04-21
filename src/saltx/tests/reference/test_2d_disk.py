@@ -358,6 +358,7 @@ def test_eval_traj(system):
         N=None,
         Q=None,
         R=None,
+        bcs=bcs["full_dbc"],
     )
 
     D0range = np.linspace(0.05, 0.2, 32)
@@ -369,7 +370,7 @@ def test_eval_traj(system):
             bcs["full_dbc"],
             diag=0.0,
         )
-        modes = algorithms.get_nevp_modes(nevp_inputs, bcs=bcs["full_dbc"])
+        modes = algorithms.get_nevp_modes(nevp_inputs)
 
         nllp = NonLasingLinearProblem(
             V=system.V,
@@ -477,7 +478,7 @@ def test_eval_traj(system):
                     bcs["full_dbc"],
                     diag=0.0,
                 )
-                modes = algorithms.get_nevp_modes(nevp_inputs, bcs=bcs["full_dbc"])
+                modes = algorithms.get_nevp_modes(nevp_inputs)
             evals = np.asarray([mode.k for mode in modes])
             vals.append(np.vstack([D0 * np.ones(evals.shape), evals]).T)
 
@@ -551,12 +552,12 @@ def solve_nevp_wrapper(
             N=None,
             Q=Q,
             R=None,
+            bcs=local_bcs,
         )
         all_modes.extend(
             algorithms.get_nevp_modes(
                 nevp_inputs,
                 bcs_name=bcs_name,
-                bcs=local_bcs,
             )
         )
     evals = np.asarray([mode.k for mode in all_modes])
@@ -705,9 +706,10 @@ def test_twomodes(system):
         N=None,
         Q=Q,
         R=None,
+        bcs=bcs["full_dbc"],
     )
 
-    modes = algorithms.get_nevp_modes(nevp_inputs, bcs=bcs["full_dbc"])
+    modes = algorithms.get_nevp_modes(nevp_inputs)
     evals = np.asarray([mode.k for mode in modes])
     plot_ciss_eigenvalues(evals, params=system.rg_params, kagt=(system.ka, system.gt))
 

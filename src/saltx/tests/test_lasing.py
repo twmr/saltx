@@ -82,8 +82,9 @@ def test_assemble_F_and_J():
         N=None,
         Q=Q,
         R=R,
+        bcs=bcs,
     )
-    modes = algorithms.get_nevp_modes(nevp_inputs, bcs=bcs)
+    modes = algorithms.get_nevp_modes(nevp_inputs)
     evals = np.asarray([mode.k for mode in modes])
 
     nlp = NonLinearProblem(

@@ -168,6 +168,7 @@ def test_eval_traj(bc_type, system, first_threshold):
         N=None,
         Q=Q,
         R=R,
+        bcs=system.bcs,
     )
 
     if refine_first_mode:
@@ -191,7 +192,7 @@ def test_eval_traj(bc_type, system, first_threshold):
         D0_constant.value = D0
         assemble_form(Q_form, system.bcs, diag=0.0, mat=nevp_inputs.Q)
 
-        modes = algorithms.get_nevp_modes(nevp_inputs, bcs=system.bcs)
+        modes = algorithms.get_nevp_modes(nevp_inputs)
         evals = np.asarray([mode.k for mode in modes])
 
         if refine_first_mode:
@@ -224,15 +225,11 @@ def test_eval_traj(bc_type, system, first_threshold):
             # solve again the NEVP with CISS, but with a single mode in the hole burning
             # term.
             nlp.update_b_and_k_for_forms([refined_mode])
-
-            Q_with_sht = fem.petsc.assemble_matrix(
-                nlp.get_Q_hbt_form(nmodes=1), bcs=system.bcs, diagonal=0.0
+            assemble_form(
+                nlp.get_Q_hbt_form(nmodes=1), system.bcs, diag=0.0, mat=nevp_inputs.Q
             )
-            Q_with_sht.assemble()
 
-            sht_modes = algorithms.get_nevp_modes(
-                nevp_inputs, custom_Q=Q_with_sht, bcs=system.bcs
-            )
+            sht_modes = algorithms.get_nevp_modes(nevp_inputs)
 
             imag_evals = np.asarray([m.k.imag for m in sht_modes])
             number_of_modes_close_to_real_axis = np.sum(np.abs(imag_evals) < 1e-10)
@@ -324,8 +321,9 @@ def test_solve(D0, bc_type, system):
         N=None,
         Q=Q,
         R=R,
+        bcs=system.bcs,
     )
-    modes = algorithms.get_nevp_modes(nevp_inputs, bcs=system.bcs)
+    modes = algorithms.get_nevp_modes(nevp_inputs)
 
     evals = np.asarray([mode.k for mode in modes])
 
@@ -401,14 +399,11 @@ def test_solve(D0, bc_type, system):
             # term.
             nlp.update_b_and_k_for_forms([refined_mode])
 
-            Q_with_sht = fem.petsc.assemble_matrix(
-                nlp.get_Q_hbt_form(nmodes=1), bcs=system.bcs, diagonal=0.0
+            assemble_form(
+                nlp.get_Q_hbt_form(nmodes=1), system.bcs, diag=0.0, mat=nevp_inputs.Q
             )
-            Q_with_sht.assemble()
 
-            sht_modes = algorithms.get_nevp_modes(
-                nevp_inputs, custom_Q=Q_with_sht, bcs=system.bcs
-            )
+            sht_modes = algorithms.get_nevp_modes(nevp_inputs)
 
             imag_evals = np.asarray([m.k.imag for m in sht_modes])
             number_of_modes_close_to_real_axis = np.sum(np.abs(imag_evals) < 1e-10)
@@ -531,8 +526,11 @@ def test_multimode_solve(D0, bc_type, system):
         N=None,
         Q=Q,
         R=R,
+        bcs=system.bcs,
     )
-    modes = algorithms.get_nevp_modes(nevp_inputs, bcs=system.bcs)
+    modes = algorithms.get_nevp_modes(
+        nevp_inputs,
+    )
 
     nlp = NonLinearProblem(
         system.V,
@@ -615,6 +613,7 @@ def test_intensity_vs_pump_esterhazy(bc_type, D0range, system):
         N=None,
         Q=Q,
         R=R,
+        bcs=system.bcs,
     )
 
     nlp = NonLinearProblem(
@@ -644,7 +643,7 @@ def test_intensity_vs_pump_esterhazy(bc_type, D0range, system):
             diag=0.0,
             mat=nevp_inputs.Q,
         )
-        modes = algorithms.get_nevp_modes(nevp_inputs, bcs=system.bcs)
+        modes = algorithms.get_nevp_modes(nevp_inputs)
         evals = np.asarray([mode.k for mode in modes])
         assert evals.size
 
@@ -681,14 +680,11 @@ def test_intensity_vs_pump_esterhazy(bc_type, D0range, system):
             # term.
             nlp.update_b_and_k_for_forms([refined_mode])
 
-            Q_with_sht = fem.petsc.assemble_matrix(
-                nlp.get_Q_hbt_form(nmodes=1), bcs=system.bcs, diagonal=0.0
+            assemble_form(
+                nlp.get_Q_hbt_form(nmodes=1), system.bcs, diag=0.0, mat=nevp_inputs.Q
             )
-            Q_with_sht.assemble()
 
-            sht_modes = algorithms.get_nevp_modes(
-                nevp_inputs, custom_Q=Q_with_sht, bcs=system.bcs
-            )
+            sht_modes = algorithms.get_nevp_modes(nevp_inputs)
 
             imag_evals = np.asarray([m.k.imag for m in sht_modes])
             number_of_modes_close_to_real_axis = np.sum(np.abs(imag_evals) < 1e-10)
