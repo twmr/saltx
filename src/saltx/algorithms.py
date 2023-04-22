@@ -398,7 +398,10 @@ def _refine_modes(
     if not converged:
         log.error(f"Mode Refinement of {modeinfos} didn't converge")
 
-    Print(f"Initial k: {[mi.k for mi in modeinfos]}, {relaxation_parameter=}")
+    Print(
+        f"Initial k: {[mi.k for mi in modeinfos]}, s: {[mi.s for mi in modeinfos]} "
+        f"{relaxation_parameter=}"
+    )
     newton_df = pd.DataFrame(
         newton_steps,
         columns=(
