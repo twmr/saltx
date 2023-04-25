@@ -11,6 +11,7 @@ See https://journals.aps.org/pra/abstract/10.1103/PhysRevA.82.063824.
 import logging
 from collections import namedtuple
 from fractions import Fraction
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -31,6 +32,8 @@ from saltx.plot import plot_ciss_eigenvalues
 log = logging.getLogger(__name__)
 
 Print = PETSc.Sys.Print
+
+reference_test_dir = Path(__file__).parent
 
 
 FIRST_THRESHOLD = 0.6110176
@@ -460,6 +463,7 @@ def test_solve(D0, system):
 
 
 def test_intensity_vs_pump(system):
+    # figure 6
     u = ufl.TrialFunction(system.V)
     v = ufl.TestFunction(system.V)
 
@@ -504,7 +508,7 @@ def test_intensity_vs_pump(system):
 
     aevals = []  # all eigenvalues of the modes without the SHT
     results = []  # list of (D0, intensity) tuples
-    for D0 in np.linspace(0.62, 1.0, 14):
+    for D0 in np.linspace(0.62, 1.27, 20):
         Print(f"{D0=}")
         D0_constant.value = D0
         assemble_form(Q_form, system.bcs, diag=0.0, mat=Q)
@@ -609,12 +613,21 @@ def test_intensity_vs_pump(system):
             aevals.append(multi_evals)
 
     _, ax = plt.subplots()
+
+    # we have to scale (in y) the intensities from the generalizations paper due to the
+    # different definitions of the intensities.
+    scale = 12  # where does this come from?
+    data = np.loadtxt(reference_test_dir / "solid-and-open-red.csv", delimiter=",")
+    ax.plot(data[:, 0], data[:, 1] * scale, "ro", alpha=0.2)
+    data = np.loadtxt(reference_test_dir / "solid-and-open-blue.csv", delimiter=",")
+    ax.plot(data[:, 0], data[:, 1] * scale, "bo", alpha=0.2)
+
     x = np.asarray([D0 for (D0, _, _) in results])
     y = np.asarray([intens for (_, _, intens) in results])
     ax.plot(
         x,
         y,
-        "x",
+        "kx",
     )
     ax.set_xlabel("Pump D0")
     ax.set_ylabel("Modal intensity at right lead + left lead")
