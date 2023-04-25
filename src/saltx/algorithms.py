@@ -443,18 +443,19 @@ def constant_pump_algorithm(
     evals = np.asarray([mode.k for mode in modes])
     minfos = []
 
-    for i in range(len(nevp_modes)):
+    active_modes = 0
+    while True:
+        active_modes += 1
+
         # I think this criterion is not good enough for the 1D slab system used in the
         # Generalizations paper (Fig 3) due to the complicated eigenvalue trajectories
         # (function of D0)
         mode = modes[evals.imag.argmax()]
-        if mode.k.imag < -1e-10 and i == 0:
+        if mode.k.imag < -1e-10 and active_modes == 1:
             # no mode above threshold found
             return []
 
-        nmodes = i + 1
-
-        if first_mode_index is not None and i == 0:
+        if first_mode_index is not None and active_modes == 1:
             mode = modes[first_mode_index]
 
         minfos.append(
@@ -466,26 +467,29 @@ def constant_pump_algorithm(
                 dof_at_maximum=mode.dof_at_maximum,
             )
         )
+        assert len(minfos) == active_modes
 
         refined_modes = refine_modes(
             minfos,
             mode.bcs,
-            newton_operators[i + 1].solver,
+            newton_operators[active_modes].solver,
             nlp,
-            newton_operators[i + 1].A,
-            newton_operators[i + 1].L,
-            newton_operators[i + 1].delta_x,
-            newton_operators[i + 1].initial_x,
+            newton_operators[active_modes].A,
+            newton_operators[active_modes].L,
+            newton_operators[active_modes].delta_x,
+            newton_operators[active_modes].initial_x,
         )
         assert all(rm.converged for rm in refined_modes)
 
-        log.debug(f"Before assembly of Q with custom sht (nmodes:{len(refined_modes)})")
+        log.debug(
+            f"Before assembly of Q with custom sht (active_modes:{len(refined_modes)})"
+        )
         # this modifies the Q matrix in nevp_inputs
         nlp.update_b_and_k_for_forms(refined_modes)
         Q = nevp_inputs.Q
         Q.zeroEntries()
         fem.petsc.assemble_matrix(
-            Q, nlp.get_Q_hbt_form(nmodes), bcs=mode.bcs, diagonal=0.0
+            Q, nlp.get_Q_hbt_form(active_modes), bcs=mode.bcs, diagonal=0.0
         )
         Q.assemble()
         log.debug("After assembly of Q with custom sht")
@@ -500,7 +504,7 @@ def constant_pump_algorithm(
             f"Number of modes close to real axis: {number_of_modes_close_to_real_axis}"
         )
 
-        assert number_of_modes_close_to_real_axis == i + 1
+        assert number_of_modes_close_to_real_axis == active_modes
 
         # TODO add a couple of sanity checks (refined_modes vs modes)
 
@@ -521,4 +525,5 @@ def constant_pump_algorithm(
             for mode in modes
             if abs(mode.k.imag) < real_axis_threshold
         ]
+        assert len(minfos) == active_modes
     raise RuntimeError("unreachable point reached")
