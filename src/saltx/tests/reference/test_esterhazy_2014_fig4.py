@@ -215,8 +215,6 @@ def test_evaltraj(system):
     PC.setType("lu")
     PC.setFactorSolverType("mumps")
 
-    vals = []
-
     if False:
         initial_mode = modes[0]
         initial_x.setValues(range(system.n), initial_mode.array)
@@ -245,12 +243,8 @@ def test_evaltraj(system):
                     nllp, nlL, nlA, initial_x, delta_x, solver, initial_mode
                 )
             )
-
-            cur_k = initial_x.getValue(system.n)
-            vals.append(np.array([D0, cur_k]))
-
-            # use the current mode as an initial guess for the mode at the next D0
-            # -> we keep initial_x as is.
+            # In this loop we use the current mode as an initial guess for the mode at
+            # the next D0 -> we keep initial_x as is.
 
     t_total = time.monotonic() - t0
     log.info(
@@ -283,7 +277,16 @@ def test_evaltraj(system):
 
         ax.grid(True)
 
-    scatter_plot(vals, "Non-Interacting thresholds")
+    scatter_plot(
+        np.asarray(
+            [
+                (D0, mode.k)
+                for D0, modes in all_parametrized_modes.items()
+                for mode in modes
+            ]
+        ),
+        "Non-Interacting thresholds",
+    )
 
     # TODO plot some mode profiles
     plt.show()
