@@ -46,8 +46,8 @@ def system():
     gt = 7.5
 
     radius = 3.2 * gt
-    vscale = 0.5 * gt / radius
-    rg_params = (ka, radius, vscale)
+    vscale = 1.35 * gt / radius
+    rg_params = (ka + 4j, radius, vscale)
     Print(f"RG params: {rg_params}")
     del radius
     del vscale
@@ -164,7 +164,8 @@ def test_evaltraj(system):
     """Determine the non-interacting eigenvalues of the system from the first
     threshold till the second threshold using a newton solver (nonlasing newton
     solver)."""
-    D0range = np.linspace(0.1523, 0.23, 16)
+    D0range = np.linspace(0.1523, 0.49, 16)[::-1]
+    # D0range = np.linspace(0.49, 0.8, 20)
     u = ufl.TrialFunction(system.V)
     v = ufl.TestFunction(system.V)
 
@@ -289,7 +290,7 @@ def test_evaltraj(system):
 
 
 def test_intensity_vs_pump_esterhazy(system):
-    D0range = np.linspace(0.1523, 0.49, 32)
+    D0range = np.linspace(0.1523, 0.49, 32)[::-1]
     u = ufl.TrialFunction(system.V)
     v = ufl.TestFunction(system.V)
 
@@ -337,7 +338,7 @@ def test_intensity_vs_pump_esterhazy(system):
     nlA = nllp.create_A(system.n)
     nlL = nllp.create_L(system.n)
     delta_x = nllp.create_dx(system.n)
-    initial_xs = [nllp.create_dx(system.n) for _ in range(3)]
+    initial_xs = [nllp.create_dx(system.n) for _ in range(4)]
 
     solver = PETSc.KSP().create(system.msh.comm)
     solver.setOperators(nlA)
@@ -357,6 +358,7 @@ def test_intensity_vs_pump_esterhazy(system):
         if not D_index:
             assemble_form(Q_form, system.bcs, diag=0.0, mat=nevp_inputs.Q)
             modes = algorithms.get_nevp_modes(nevp_inputs)
+            assert len(modes) == 4
             for mode, initial_x in zip(modes, initial_xs):
                 initial_x.setValues(range(system.n), mode.array)
                 initial_x.setValue(system.n, mode.k)
@@ -409,6 +411,7 @@ def test_intensity_vs_pump_esterhazy(system):
         cbar.set_label("D0", loc="top")
 
         plot_ellipse(ax, system.rg_params)
+        ax.plot(system.ka, -system.gt, "ro", label="singularity"),
 
         ax.grid(True)
 
