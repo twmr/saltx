@@ -352,6 +352,10 @@ def test_intensity_vs_pump_esterhazy(system):
     results = []  # list of (D0, intensity) tuples
 
     modes = []
+    active_modes = []
+
+    all_nonlasing_modes = {}
+
     for D_index, D0 in enumerate(D0range):
         Print(f" {D0=} ".center(80, "#"))
         D0_constant.value = D0
@@ -371,25 +375,127 @@ def test_intensity_vs_pump_esterhazy(system):
         evals = np.asarray([mode.k for mode in modes])
         assert evals.size
         aevals.append(np.vstack((D0 * np.ones(evals.shape), evals)).T)
-        # continue
+        all_nonlasing_modes[D0] = modes
 
-        multi_modes = algorithms.constant_pump_algorithm(
-            modes,
-            nevp_inputs,
-            nlp,
-            newton_operators,
-            real_axis_threshold=3e-9,
-            s_init=1.0,
-        )
+    log.info("Finished calculating all non-lasing modes")
+
+    cpa_counter = 0
+    for D0, modes in all_nonlasing_modes.items():
+        Print(f" {D0=} ".center(80, "#"))
+        D0_constant.value = D0
+
+        s_init = 1.0
+        real_axis_threshold = 3e-9
+        if not active_modes:
+            log.warning("Starting CPA")
+            active_modes = algorithms.constant_pump_algorithm(
+                modes,
+                nevp_inputs,
+                nlp,
+                newton_operators,
+                real_axis_threshold=3e-9,
+                s_init=s_init,
+            )
+            log.warning("Finished CPA")
+        else:
+            minfos = [
+                newtils.NewtonModeInfo(
+                    k=mode.k.real,
+                    s=mode.s,
+                    re_array=mode.array.real / mode.s,
+                    im_array=mode.array.imag / mode.s,
+                    dof_at_maximum=mode.dof_at_maximum,
+                )
+                for mode in active_modes
+            ]
+            n_active_modes = len(active_modes)
+            nops = newton_operators[n_active_modes]
+            try:
+                refined_modes = algorithms.refine_modes(
+                    minfos,
+                    system.bcs,
+                    nops.solver,
+                    nlp,
+                    nops.A,
+                    nops.L,
+                    nops.delta_x,
+                    nops.initial_x,
+                    fail_early=True,
+                )
+            except ValueError:
+                # the modes couldn't be refined
+                log.error("Starting CPA")
+                active_modes = algorithms.constant_pump_algorithm(
+                    modes,
+                    nevp_inputs,
+                    nlp,
+                    newton_operators,
+                    real_axis_threshold=real_axis_threshold,
+                    s_init=s_init,
+                )
+                cpa_counter += 1
+                log.error("Finished CPA")
+            else:
+                assert all(rm.converged for rm in refined_modes)
+
+                check_other_activated_modes = False
+                if check_other_activated_modes:
+                    log.debug(
+                        "Before assembly of Q with custom hole-burning term"
+                        "(active_modes:{len(refined_modes)})"
+                    )
+                    # this modifies the Q matrix in nevp_inputs
+                    nlp.update_b_and_k_for_forms(refined_modes)
+                    Q = nevp_inputs.Q
+                    Q.zeroEntries()
+                    fem.petsc.assemble_matrix(
+                        Q,
+                        nlp.get_Q_hbt_form(n_active_modes),
+                        bcs=system.bcs,
+                        diagonal=0.0,
+                    )
+                    Q.assemble()
+                    log.debug("After assembly of Q with custom SHB term")
+
+                    modes = algorithms.get_nevp_modes(nevp_inputs)
+                    evals = np.asarray([mode.k for mode in modes])
+
+                    number_of_modes_close_to_real_axis = np.sum(
+                        np.abs(evals.imag) < real_axis_threshold
+                    )
+                    Print(
+                        f"Number of modes close to real axis: "
+                        f"{number_of_modes_close_to_real_axis}"
+                    )
+
+                    assert number_of_modes_close_to_real_axis == n_active_modes
+
+                    number_of_modes_above_real_axis = np.sum(
+                        evals.imag > real_axis_threshold
+                    )
+                    Print(
+                        f"Number of modes above real axis: "
+                        f"{number_of_modes_above_real_axis}"
+                    )
+                    if number_of_modes_above_real_axis > 0:
+                        raise RuntimeError(
+                            "New mode turned on. This is not "
+                            "expected for this test-case"
+                        )
+
+                active_modes = refined_modes
+
         if False:
-            multi_evals = np.asarray([mode.k for mode in multi_modes])
-            aevals.append(np.vstack((D0 * np.ones(multi_evals.shape), multi_evals)).T)
+            active_evals = np.asarray([mode.k for mode in active_modes])
+            aevals.append(np.vstack((D0 * np.ones(active_evals.shape), active_evals)).T)
 
-        for mode in multi_modes:
+        for mode in active_modes:
             mode_values = system.evaluator(mode)
             mode_intensity = abs(mode_values) ** 2
             Print(f"-> {mode_intensity=}")
             results.append((D0, mode_intensity))
+
+    assert cpa_counter == 1  # when the number of modes has changed
 
     def scatter_plot(vals, title):
         fig, ax = plt.subplots()
