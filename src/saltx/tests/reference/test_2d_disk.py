@@ -33,7 +33,7 @@ A cylindrically symmetric micro-disk laser has the following eigenmodes:
 In addition to the (angular) quantum number l, there is also a radial quantum number j,
 whose value corresponds to the number of lobes (in radial direction) of the mode.
 
-Note that it is possible that j > l, because their always exists an infinite number of
+Note that it is possible that j > l, because there always exists an infinite number of
 pairs (l, j) for a given l.
 """
 import enum
