@@ -60,8 +60,7 @@ def determine_meshtags_for_1d(msh):
     values = np.hstack((left_vals, right_vals))
 
     indices, pos = np.unique(indices, return_index=True)
-    marker = meshtags(msh, msh.topology.dim - 1, indices, values[pos])
-    return marker
+    return meshtags(msh, msh.topology.dim - 1, indices, values[pos])
 
 
 @pytest.fixture
@@ -127,8 +126,7 @@ def system(bc_type):
     n = V.dofmap.index_map.size_global
 
     fixture_locals = locals()
-    nt = namedtuple("System", list(fixture_locals.keys()))(**fixture_locals)
-    return nt
+    return namedtuple("System", list(fixture_locals.keys()))(**fixture_locals)
 
 
 @pytest.mark.parametrize("bc_type", [BCType.DBC])

@@ -41,13 +41,11 @@ def create_combined_interval_mesh(xstart, domains):
     cells = np.hstack([vert_ids, vert_ids + 1])
 
     # why do we need a domain for create_mesh and not for create_unit_interval?
-    msh = mesh.create_mesh(MPI.COMM_WORLD, cells, vertices, domain)
+    return mesh.create_mesh(MPI.COMM_WORLD, cells, vertices, domain)
 
     # V = fem.FunctionSpace(msh, ("P", 1))
     # log.info(V.tabulate_dof_coordinates(), msh.geometry.dim)
     # log.info(msh.topology.index_map(msh.topology.dim).size_local)
-
-    return msh
 
 
 def create_dcells(msh, xstart: Fraction, domains) -> list[np.ndarray]:

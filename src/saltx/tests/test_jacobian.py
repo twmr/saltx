@@ -105,14 +105,14 @@ def test_create_salt_jacobian_block_matrix(nmodes):
             )
         ).all()
         return
-    else:
-        assert (
-            rows_ind
-            == np.array(
-                [0, 6, 14, 22, 30, 38, 44, 50, 58, 66, 74, 82, 88, 95, 102],
-                dtype=np.int32,
-            )
-        ).all()
+
+    assert (
+        rows_ind
+        == np.array(
+            [0, 6, 14, 22, 30, 38, 44, 50, 58, 66, 74, 82, 88, 95, 102],
+            dtype=np.int32,
+        )
+    ).all()
 
     assert (
         cols

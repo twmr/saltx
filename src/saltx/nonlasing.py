@@ -256,8 +256,7 @@ class NonLasingLinearProblem:
         return A
 
     def create_L(self, n_fem):
-        L = PETSc.Vec().createSeq(n_fem + 1)
-        return L
+        return PETSc.Vec().createSeq(n_fem + 1)
 
     def create_dx(self, n_fem):
         # n_fem (complex-valued) entries for b, 1 for k

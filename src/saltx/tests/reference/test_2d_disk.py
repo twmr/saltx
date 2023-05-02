@@ -223,8 +223,7 @@ def system():
     n = V.dofmap.index_map.size_global
 
     fixture_locals = locals()
-    nt = namedtuple("System", list(fixture_locals.keys()))(**fixture_locals)
-    return nt
+    return namedtuple("System", list(fixture_locals.keys()))(**fixture_locals)
 
 
 def build_single_T_nonlinear(quantum_l, k, ka, gt, D0, nc):

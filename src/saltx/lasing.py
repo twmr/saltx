@@ -117,8 +117,9 @@ class NonLinearProblem:
                 break
             gk = gt / (k - ka + 1j * gt)
             sht += abs(gk * b) ** 2
-        qform = fem.form(self.pump / (1 + sht) * inner(u, v) * dx)
-        return qform
+
+        # create the final Q form
+        return fem.form(self.pump / (1 + sht) * inner(u, v) * dx)
 
     def _create_newton_forms(self, nmodes):
         spaces = self._max_spaces[:nmodes]
