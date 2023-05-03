@@ -9,14 +9,12 @@ initio laser theory".
 See https://link.aps.org/doi/10.1103/PhysRevA.90.023816.
 """
 
-import time
 from collections import namedtuple
 from logging import getLogger
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import pytest
 import ufl
 from dolfinx import fem
@@ -25,10 +23,9 @@ from mpi4py import MPI
 from petsc4py import PETSc
 from ufl import curl, dx, elem_mult, inner
 
-from saltx import algorithms
+from saltx import algorithms, newtils
 from saltx.assemble import assemble_form
-from saltx.log import Timer
-from saltx.nonlasing import NonLasingLinearProblem
+from saltx.lasing import NonLinearProblem
 from saltx.plot import plot_ellipse, plot_meshfunctions
 from saltx.pml import RectPML
 
@@ -104,6 +101,10 @@ def system():
     points = np.vstack([X.flatten(), Y.flatten()])
     evaluator = algorithms.Evaluator(V, msh, points)
     del points
+
+    phi = np.linspace(0, 2 * np.pi, 256)
+    points = np.vstack([np.cos(phi), np.sin(phi)])
+    evaluator_circle = algorithms.Evaluator(V, msh, points)
 
     n = V.dofmap.index_map.size_global
 
@@ -228,11 +229,12 @@ def solve_nevp_wrapper(
 
 
 def test_solve_fixed_pump(system, system_quarter):
-    """Determine the lasing mode at D0=0.076."""
+    """Determine the lasing mode at D0=0.1."""
     # For solving the NEVP we use the quarter circle mesh with different boundary
     # conditions. We then refine a circulating mode with Im(k) > 0 s.t. it reaches the
-    # real axis. The mode-refining is done using the full-circle mesh, because this is
-    # needed for the multi mode support anyway.
+    # real axis. The mode-refining is done using the full-circle mesh, because a
+    # circulating (sum of a mode with DBC and a mode with NBC) mode doesn't have well
+    # defined BCs for the quarter mesh.
 
     def on_outer_boundary(x):
         return np.isclose(x[0], system_quarter.pml_end) | np.isclose(
@@ -266,8 +268,11 @@ def test_solve_fixed_pump(system, system_quarter):
         ],
     }
 
-    D0range = [0.076]  # close to first threshold (see the text in the paper)
+    # D0range = [0.076]  # close to first threshold (see the text in the paper)
+    D0range = [0.1]  # the convergence of refine_modes is better at D0=1.0
+    # TODO figure out why the convergence is not so good at smaller D0
     D0_constant = real_const(system_quarter.V, D0range[0])
+    D0_constant_circle = real_const(system.V, D0range[0])
 
     modes, _ = solve_nevp_wrapper(
         system_quarter.ka,
@@ -283,167 +288,200 @@ def test_solve_fixed_pump(system, system_quarter):
     assert len(modes) == 22
     assert modes[0].bcs_name == "full_dbc"
 
-    # TODO transform the modes on the quarter mesh to modes on the full mesh
-    # TODO then create a circulating mode by summing up (make sure that the
-    #      amplitude is correct first) the single full_dbc mode and the single
-    #      full_nbc mode.
-    # TODO refine this mode
-    # TODO do this till 0.15 where still only a single mode is lasing
-
-    return
-
-    u = ufl.TrialFunction(system.V)
-    v = ufl.TestFunction(system.V)
-
-    L = assemble_form(-inner(elem_mult(system.invperm, curl(u)), curl(v)) * dx, bcs)
-    M = assemble_form(system.dielec * inner(u, v) * dx, bcs, diag=0.0)
-
-    nevp_inputs = algorithms.NEVPInputs(
-        ka=system.ka,
-        gt=system.gt,
-        rg_params=system.rg_params,
-        L=L,
-        M=M,
-        N=None,
-        Q=None,
-        R=None,
-        bcs=bcs,
-    )
-
-    nevp_inputs.Q = assemble_form(
-        D0_constant * system.pump_profile * inner(u, v) * dx,
-        bcs,
-        diag=0.0,
-    )
-    modes = algorithms.get_nevp_modes(nevp_inputs)
-
-    nllp = NonLasingLinearProblem(
-        V=system.V,
-        ka=system.ka,
-        gt=system.gt,
-        dielec=system.dielec,
-        invperm=system.invperm,
-        pump=D0_constant * system.pump_profile,
-        bcs=bcs,
-        ds_obc=None,
-    )
-
-    nlA = nllp.create_A(system.n)
-    nlL = nllp.create_L(system.n)
-    delta_x = nllp.create_dx(system.n)
-    initial_x = nllp.create_dx(system.n)
-
-    solver = PETSc.KSP().create(system.msh.comm)
-    solver.setOperators(nlA)
-
-    if False:
-
-        def monitor(ksp, its, rnorm):
-            print(f"{its}, {rnorm}")
-
-        solver.setMonitor(monitor)
-
-    # Preconditioner (this has a huge impact on performance!!!)
-    PC = solver.getPC()
-    PC.setType("lu")
-    PC.setFactorSolverType("mumps")
-
-    vals = []
-    max_iterations = 20
-
-    t0 = time.monotonic()
-    for midx in [10]:  # range(7,13):
-        initial_mode = modes[midx]
-
-        initial_x.setValues(range(system.n), initial_mode.array)
-        initial_x.setValue(system.n, initial_mode.k)
-        assert initial_x.getSize() == system.n + 1
-
-        for D0 in D0range:
-            log.info(f" {D0=} ".center(80, "#"))
-            log.error(f"Starting newton algorithm for mode @ k = {initial_mode.k}")
-            D0_constant.value = D0
-
-            i = 0
-
-            newton_steps = []
-            while i < max_iterations:
-                tstart = time.monotonic()
-                with Timer(log.info, "assemble F vec and J matrix"):
-                    nllp.assemble_F_and_J(
-                        nlL, nlA, initial_x, initial_mode.dof_at_maximum
-                    )
-                nlL.ghostUpdate(
-                    addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE
-                )
-                # Scale residual by -1
-                nlL.scale(-1)
-                nlL.ghostUpdate(
-                    addv=PETSc.InsertMode.INSERT_VALUES,
-                    mode=PETSc.ScatterMode.FORWARD,
-                )
-
-                with Timer(Print, "Solve KSP"):
-                    solver.solve(nlL, delta_x)
-
-                relaxation_param = 1.0
-                initial_x += relaxation_param * delta_x
-
-                cur_k = initial_x.getValue(system.n)
-                Print(f"DELTA k: {delta_x.getValue(system.n)}")
-
-                i += 1
-
-                # Compute norm of update
-                correction_norm = delta_x.norm(0)
-
-                newton_steps.append((cur_k, correction_norm, time.monotonic() - tstart))
-
-                Print(f"----> Iteration {i}: Correction norm {correction_norm}")
-                if correction_norm < 1e-10:
-                    break
-
-            if correction_norm > 1e-10:
-                raise RuntimeError(f"mode at {initial_mode.k} didn't converge")
-
-            Print(f"Initial k: {initial_mode.k} ...")
-            df = pd.DataFrame(newton_steps, columns=["k", "corrnorm", "dt"])
-            vals.append(np.array([D0, cur_k]))
-            Print(df)
-
-            # use the current mode as an initial guess for the mode at the next D0
-            # -> we keep initial_x as is.
-            evals = np.asarray([mode.k for mode in modes])
-            vals.append(np.vstack([D0 * np.ones(evals.shape), evals]).T)
-
-    t_total = time.monotonic() - t0
-    log.info(
-        f"The eval trajectory code ({D0range.size} D0 steps) took"
-        f"{t_total:.1f}s (avg per iteration: {t_total/D0range.size:.3f}s)"
-    )
-
     def scatter_plot(vals, title):
         fig, ax = plt.subplots()
         fig.suptitle(title)
 
-        merged = np.vstack(vals)
-        X, Y, C = (
-            merged[:, 1].real,
-            merged[:, 1].imag,
-            merged[:, 0].real,
-        )
-        norm = plt.Normalize(C.min(), C.max())
-
-        sc = ax.scatter(X, Y, c=C, norm=norm)
+        ax.scatter(vals.real, vals.imag)
         ax.set_xlabel("k.real")
         ax.set_ylabel("k.imag")
-
-        cbar = fig.colorbar(sc, ax=ax)
-        cbar.set_label("D0", loc="top")
 
         plot_ellipse(ax, system.rg_params)
 
         ax.grid(True)
 
-    scatter_plot(vals, "Non-Interacting thresholds")
+    scatter_plot(np.asarray([mode.k for mode in modes]), "Non-Interacting thresholds")
     plt.show()
+
+    dbc_modes_above_threshold = [
+        mode for mode in modes if mode.bcs_name == "full_dbc" and mode.k.imag > 0
+    ]
+    assert len(dbc_modes_above_threshold) == 1
+
+    nbc_modes_above_threshold = [
+        mode for mode in modes if mode.bcs_name == "full_nbc" and mode.k.imag > 0
+    ]
+    assert len(nbc_modes_above_threshold) == 1
+
+    # transform the modes on the quarter mesh to modes on the full mesh
+
+    dbc_mode = fem.Function(system.V)
+
+    def dbc_interpolate(points: np.ndarray) -> np.ndarray:
+        # points is a 3 x N matrix
+        quarter_mode = dbc_modes_above_threshold[0]
+        eval_points = np.abs(points)
+        #  now eval quarter_mode at the eval_points and return the values
+        quarter_evaluator = algorithms.Evaluator(
+            system_quarter.V, system_quarter.msh, eval_points
+        )
+        emode = quarter_evaluator(quarter_mode)  # has shape (N,)
+        positive_sign_mask = np.logical_or(
+            np.logical_and(points[0, :] > 0, points[1, :] > 0),
+            np.logical_and(points[0, :] < 0, points[1, :] < 0),
+        )
+        emode[~positive_sign_mask] *= -1
+
+        return emode
+
+    dbc_mode.interpolate(dbc_interpolate)
+
+    nbc_mode = fem.Function(system.V)
+
+    def nbc_interpolate(points: np.ndarray) -> np.ndarray:
+        # points is a 3 x N matrix
+        quarter_mode = nbc_modes_above_threshold[0]
+
+        eval_points = np.abs(points)
+        quarter_evaluator = algorithms.Evaluator(
+            system_quarter.V, system_quarter.msh, eval_points
+        )
+        return quarter_evaluator(quarter_mode)  # has shape (N,)
+
+    nbc_mode.interpolate(nbc_interpolate)
+
+    debug = False
+    if debug:
+        # plot the modes on the circle mesh
+        for vals in [
+            system.evaluator(dbc_mode.x.array).reshape(system.X.shape),
+            system.evaluator(nbc_mode.x.array).reshape(system.X.shape),
+        ]:
+            _, ax = plt.subplots()
+            ax.pcolormesh(
+                system.X,
+                system.Y,
+                abs(vals) ** 2,
+                vmin=0.0,
+            )
+            plt.show()
+
+    _lam = dbc_modes_above_threshold[0].k
+    assert _lam.imag > 0
+
+    mode_dbc = dbc_mode.vector.getArray().copy()
+    mode_nbc = nbc_mode.vector.getArray().copy()
+
+    #    = "cos"    - 1j "sin"
+    mode = mode_nbc - 1j * mode_dbc
+
+    if debug:
+        vals = system.evaluator(mode).reshape(system.X.shape)
+        _, ax = plt.subplots()
+        # a nice ring pattern should be shown here
+        ax.pcolormesh(
+            system.X,
+            system.Y,
+            abs(vals) ** 2,
+            vmin=0.0,
+        )
+
+        vals = system.evaluator_circle(mode)  # .reshape(system.X.shape)
+        _, ax = plt.subplots()
+        # ax.pcolormesh(
+        #     system.X,
+        #     system.Y,
+        #     vals.real,
+        #     #abs(vals) ** 2,
+        #     # vmin=0.0,
+        # )
+        ax.plot(system.PHI - np.pi, abs(vals) ** 2)
+
+        vals = system.evaluator_circle(mode_dbc)  # .reshape(system.X.shape)
+        _, ax = plt.subplots()
+        # ax.pcolormesh(
+        #     system.X,
+        #     system.Y,
+        #     # vals.real,
+        #     abs(vals) ** 2,
+        #     vmin=0.0,
+        # )
+        ax.plot(system.PHI - np.pi, abs(vals) ** 2)
+
+        vals = system.evaluator_circle(mode_nbc)  # .reshape(system.X.shape)
+        _, ax = plt.subplots()
+        # ax.pcolormesh(
+        #     system.X,
+        #     system.Y,
+        #     # vals.real,
+        #     abs(vals) ** 2,
+        #     vmin=0.0,
+        # )
+        ax.plot(system.PHI - np.pi, abs(vals) ** 2)
+        plt.show()
+
+    dof_at_maximum = np.abs(mode).argmax()
+    val_maximum = mode[np.abs(mode).argmax()]
+    # fix norm and the phase
+    mode /= val_maximum
+
+    def on_outer_boundary(x):
+        return np.isclose(abs(x[0]), system.pml_end) | np.isclose(
+            abs(x[1]), system.pml_end
+        )
+
+    bcs_dofs_circle = fem.locate_dofs_geometrical(
+        system.V,
+        on_outer_boundary,
+    )
+
+    bcs = [
+        fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs_circle, system.V),
+    ]
+
+    mode = algorithms.NEVPNonLasingMode(
+        array=mode,
+        k=_lam,
+        error=0.0,
+        bcs_name="default",
+        bcs=bcs,
+        dof_at_maximum=dof_at_maximum,
+    )
+
+    # TODO do this till 0.15 where still only a single mode is lasing
+
+    nlp = NonLinearProblem(
+        system.V,
+        system.ka,
+        system.gt,
+        dielec=system.dielec,
+        invperm=system.invperm,
+        n=system.n,
+        pump=D0_constant_circle * system.pump_profile,
+        ds_obc=None,
+    )
+    newton_operators = newtils.create_multimode_solvers_and_matrices(nlp, max_nmodes=1)
+
+    minfos = [
+        newtils.NewtonModeInfo(
+            k=mode.k.real,
+            s=1.0,
+            re_array=mode.array.real,
+            im_array=mode.array.imag,
+            dof_at_maximum=mode.dof_at_maximum,
+        )
+    ]
+    active_modes = 1
+    refined_modes = algorithms.refine_modes(
+        minfos,
+        mode.bcs,
+        newton_operators[active_modes].solver,
+        nlp,
+        newton_operators[active_modes].A,
+        newton_operators[active_modes].L,
+        newton_operators[active_modes].delta_x,
+        newton_operators[active_modes].initial_x,
+    )
+    assert all(rm.converged for rm in refined_modes)
+
+    # TODO determine internal intesity
