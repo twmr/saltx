@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 import ufl
-from dolfinx import fem
+from dolfinx import fem, mesh
 from dolfinx.io import XDMFFile
 from mpi4py import MPI
 from petsc4py import PETSc
@@ -60,6 +60,25 @@ def system():
     with XDMFFile(MPI.COMM_WORLD, pxdmf, "r") as fh:
         msh = fh.read_mesh(name="mcav")
     del fh
+
+    # TODO try to extract the relevant information (Physical Surfice "CAV") from the
+    # gmsh file(s)
+
+    # Copied from (def test_manual_integration_domains())
+    tdim = msh.topology.dim
+    cell_map = msh.topology.index_map(tdim)
+    num_cells = cell_map.size_local + cell_map.num_ghosts
+    cell_indices = np.arange(0, num_cells)
+    cell_values = np.zeros_like(cell_indices, dtype=np.intc)
+    marked_cells = mesh.locate_entities(
+        msh, tdim, lambda x: x[0] ** 2 + x[1] ** 2 < 1.0
+    )
+
+    circle_meshtag = 7  # this is an arbitrary number
+    cell_values[marked_cells] = circle_meshtag
+    mt_cells = mesh.meshtags(msh, tdim, cell_indices, cell_values)
+
+    dx_circle = ufl.Measure("dx", subdomain_data=mt_cells, domain=msh)(circle_meshtag)
 
     V = fem.FunctionSpace(msh, ("Lagrange", 4))
 
@@ -350,6 +369,13 @@ def test_solve_fixed_pump(system, system_quarter):
 
     nbc_mode.interpolate(nbc_interpolate)
 
+    # 20 is the id of the Physical Surface called "CAV".
+    internal_intensity = fem.assemble_scalar(
+        fem.form(abs(nbc_mode) ** 2 * system.dx_circle)
+    )
+    assert internal_intensity.imag < 1e-15
+    assert internal_intensity.real == pytest.approx(0.5, rel=0.1)
+
     debug = False
     if debug:
         # plot the modes on the circle mesh
@@ -483,5 +509,24 @@ def test_solve_fixed_pump(system, system_quarter):
         newton_operators[active_modes].initial_x,
     )
     assert all(rm.converged for rm in refined_modes)
+    assert len(refined_modes) == 1
 
-    # TODO determine internal intesity
+    # determine internal intensity and compare it against the value from figure 7
+
+    fem_mode = fem.Function(system.V)
+    fem_mode.x.array[:] = refined_modes[0].array
+    internal_intensity = fem.assemble_scalar(
+        fem.form(abs(fem_mode) ** 2 * system.dx_circle)
+    )
+    assert internal_intensity.imag < 1e-15
+    assert internal_intensity.real == pytest.approx(0.568, rel=1e-3)
+
+
+def test_plot():
+    fig, ax = plt.subplots()
+    refdata = np.loadtxt("./data/figures/esterhazy_fig7/mode1.csv", delimiter=",")
+    ax.plot(refdata[:, 0], refdata[:, 1], "x")
+
+    # my results
+    ax.plot([0.08, 0.09, 0.1, 0.13, 0.16], [0.1088, 0.336, 0.568, 1.284, 2.0241], "-o")
+    plt.show()
