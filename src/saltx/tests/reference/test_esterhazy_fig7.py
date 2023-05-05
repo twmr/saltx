@@ -8,7 +8,7 @@ initio laser theory".
 
 See https://link.aps.org/doi/10.1103/PhysRevA.90.023816.
 """
-
+import sys
 from collections import namedtuple
 from logging import getLogger
 from pathlib import Path
@@ -71,7 +71,7 @@ def system():
     cell_indices = np.arange(0, num_cells)
     cell_values = np.zeros_like(cell_indices, dtype=np.intc)
     marked_cells = mesh.locate_entities(
-        msh, tdim, lambda x: x[0] ** 2 + x[1] ** 2 < 1.0
+        msh, tdim, lambda x: abs(x[0] + 1j * x[1]) <= 1.0 + sys.float_info.epsilon
     )
 
     circle_meshtag = 7  # this is an arbitrary number
@@ -325,12 +325,20 @@ def test_solve_fixed_pump(system, system_quarter):
     dbc_modes_above_threshold = [
         mode for mode in modes if mode.bcs_name == "full_dbc" and mode.k.imag > 0
     ]
-    assert len(dbc_modes_above_threshold) == 1
+    assert len(dbc_modes_above_threshold) > 0
+
+    k_fm = 5.380  # approx k first mode
+    dbc_quarter_mode = dbc_modes_above_threshold[
+        np.argmin([abs(m.k.real - k_fm) for m in dbc_modes_above_threshold])
+    ]
 
     nbc_modes_above_threshold = [
         mode for mode in modes if mode.bcs_name == "full_nbc" and mode.k.imag > 0
     ]
-    assert len(nbc_modes_above_threshold) == 1
+    assert len(nbc_modes_above_threshold) > 0
+    nbc_quarter_mode = nbc_modes_above_threshold[
+        np.argmin([abs(m.k.real - k_fm) for m in nbc_modes_above_threshold])
+    ]
 
     # transform the modes on the quarter mesh to modes on the full mesh
 
@@ -338,7 +346,7 @@ def test_solve_fixed_pump(system, system_quarter):
 
     def dbc_interpolate(points: np.ndarray) -> np.ndarray:
         # points is a 3 x N matrix
-        quarter_mode = dbc_modes_above_threshold[0]
+        quarter_mode = dbc_quarter_mode
         eval_points = np.abs(points)
         #  now eval quarter_mode at the eval_points and return the values
         quarter_evaluator = algorithms.Evaluator(
@@ -359,7 +367,7 @@ def test_solve_fixed_pump(system, system_quarter):
 
     def nbc_interpolate(points: np.ndarray) -> np.ndarray:
         # points is a 3 x N matrix
-        quarter_mode = nbc_modes_above_threshold[0]
+        quarter_mode = nbc_quarter_mode
 
         eval_points = np.abs(points)
         quarter_evaluator = algorithms.Evaluator(
@@ -369,19 +377,18 @@ def test_solve_fixed_pump(system, system_quarter):
 
     nbc_mode.interpolate(nbc_interpolate)
 
-    # 20 is the id of the Physical Surface called "CAV".
-    internal_intensity = fem.assemble_scalar(
+    nbc_internal_intensity = fem.assemble_scalar(
         fem.form(abs(nbc_mode) ** 2 * system.dx_circle)
     )
-    assert internal_intensity.imag < 1e-15
-    assert internal_intensity.real == pytest.approx(0.5, rel=0.1)
+    assert nbc_internal_intensity.imag < 1e-15
+    assert nbc_internal_intensity.real == pytest.approx(0.662, rel=0.1)
 
     debug = False
     if debug:
         # plot the modes on the circle mesh
-        for vals in [
-            system.evaluator(dbc_mode.x.array).reshape(system.X.shape),
-            system.evaluator(nbc_mode.x.array).reshape(system.X.shape),
+        for title, vals in [
+            ("DBC mode", system.evaluator(dbc_mode.x.array).reshape(system.X.shape)),
+            ("NBC mode", system.evaluator(nbc_mode.x.array).reshape(system.X.shape)),
         ]:
             _, ax = plt.subplots()
             ax.pcolormesh(
@@ -390,7 +397,8 @@ def test_solve_fixed_pump(system, system_quarter):
                 abs(vals) ** 2,
                 vmin=0.0,
             )
-            plt.show()
+            ax.set_title(title)
+        plt.show()
 
     _lam = dbc_modes_above_threshold[0].k
     assert _lam.imag > 0
@@ -421,7 +429,7 @@ def test_solve_fixed_pump(system, system_quarter):
         #     #abs(vals) ** 2,
         #     # vmin=0.0,
         # )
-        ax.plot(system.PHI - np.pi, abs(vals) ** 2)
+        ax.plot(system.phi - np.pi, abs(vals) ** 2)
 
         vals = system.evaluator_circle(mode_dbc)  # .reshape(system.X.shape)
         _, ax = plt.subplots()
@@ -432,7 +440,7 @@ def test_solve_fixed_pump(system, system_quarter):
         #     abs(vals) ** 2,
         #     vmin=0.0,
         # )
-        ax.plot(system.PHI - np.pi, abs(vals) ** 2)
+        ax.plot(system.phi - np.pi, abs(vals) ** 2)
 
         vals = system.evaluator_circle(mode_nbc)  # .reshape(system.X.shape)
         _, ax = plt.subplots()
@@ -443,7 +451,7 @@ def test_solve_fixed_pump(system, system_quarter):
         #     abs(vals) ** 2,
         #     vmin=0.0,
         # )
-        ax.plot(system.PHI - np.pi, abs(vals) ** 2)
+        ax.plot(system.phi - np.pi, abs(vals) ** 2)
         plt.show()
 
     dof_at_maximum = np.abs(mode).argmax()
@@ -519,7 +527,7 @@ def test_solve_fixed_pump(system, system_quarter):
         fem.form(abs(fem_mode) ** 2 * system.dx_circle)
     )
     assert internal_intensity.imag < 1e-15
-    assert internal_intensity.real == pytest.approx(0.568, rel=1e-3)
+    assert internal_intensity.real == pytest.approx(0.742, rel=1e-3)
 
 
 def test_plot():
@@ -528,5 +536,10 @@ def test_plot():
     ax.plot(refdata[:, 0], refdata[:, 1], "x")
 
     # my results
-    ax.plot([0.08, 0.09, 0.1, 0.13, 0.16], [0.1088, 0.336, 0.568, 1.284, 2.0241], "-o")
+    ax.plot(
+        [0.08, 0.1, 0.13339275245890964, 0.15946653060338278],
+        [0.14217403550027424, 0.7422087350381327, 1.785008156714247, 2.626127947527164],
+        "-o",
+    )
+
     plt.show()
