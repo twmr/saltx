@@ -474,14 +474,7 @@ def test_solve_single_mode_D0range(system, system_quarter):
             abs(x[1]), system.pml_end
         )
 
-    bcs_dofs_circle = fem.locate_dofs_geometrical(
-        system.V,
-        on_outer_boundary,
-    )
-
-    bcs = [
-        fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs_circle, system.V),
-    ]
+    bcs = []
 
     mode = algorithms.NEVPNonLasingMode(
         array=mode,
@@ -525,7 +518,7 @@ def test_solve_single_mode_D0range(system, system_quarter):
         D0_constant_circle.value = D0
         refined_modes = algorithms.refine_modes(
             minfos,
-            mode.bcs,
+            bcs,
             newton_operators[active_modes].solver,
             nlp,
             newton_operators[active_modes].A,
