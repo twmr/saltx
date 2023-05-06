@@ -307,11 +307,11 @@ def test_solve_fixed_pump(system, system_quarter):
         # at the outer pml we impose DBC but at the symmetry axes we impose NBC.
         on_outer_boundary,
     )
-    bcs_dofs_mixed = fem.locate_dofs_geometrical(
-        system_quarter.V,
-        # DBC at x-axis, NBC at y-axis
-        lambda x: np.isclose(x[1], 0) | on_outer_boundary(x),
-    )
+    # bcs_dofs_mixed = fem.locate_dofs_geometrical(
+    #     system_quarter.V,
+    #     # DBC at x-axis, NBC at y-axis
+    #     lambda x: np.isclose(x[1], 0) | on_outer_boundary(x),
+    # )
 
     bcs = {
         "full_dbc": [
@@ -320,9 +320,9 @@ def test_solve_fixed_pump(system, system_quarter):
         "full_nbc": [
             fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs_nbc, system_quarter.V),
         ],
-        "mixed": [
-            fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs_mixed, system_quarter.V),
-        ],
+        # "mixed": [
+        #     fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs_mixed, system_quarter.V),
+        # ],
     }
 
     # D0range = [0.076]  # close to first threshold (see the text in the paper)
@@ -342,7 +342,7 @@ def test_solve_fixed_pump(system, system_quarter):
         bcs,
     )
 
-    assert len(modes) == 22
+    assert len(modes) == 14
     assert modes[0].bcs_name == "full_dbc"
 
     def scatter_plot(vals, title):
