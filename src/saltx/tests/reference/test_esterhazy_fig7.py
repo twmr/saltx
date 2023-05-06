@@ -40,6 +40,44 @@ def real_const(V, real_value: float) -> fem.Constant:
     return fem.Constant(V.mesh, complex(real_value, 0))
 
 
+def map_function_to_circle_mesh(
+    mode_on_quarter_circle: algorithms.NEVPNonLasingMode,
+    quadrant_signs: np.ndarray,
+    V_circle,
+    V_quarter_circle,
+) -> fem.Function:
+    """Creates a full-circle FEM func from a quarter-circle func with BCS."""
+    circle_mode = fem.Function(V_circle)
+
+    def interpolate(points: np.ndarray) -> np.ndarray:
+        # `points` is a 3 x N matrix
+        eval_points = np.abs(points)
+
+        # eval quarter_mode at the `eval_points` and return the values
+        quarter_evaluator = algorithms.Evaluator(
+            V_quarter_circle, V_quarter_circle.mesh, eval_points
+        )
+        evaluated_mode = quarter_evaluator(mode_on_quarter_circle)  # has shape (N,)
+
+        if quadrant_signs[0, 0] == -1:  # upper left quadrant
+            mask = np.logical_and(points[0, :] < 0, points[1, :] >= 0)
+            evaluated_mode[mask] *= -1
+        if quadrant_signs[0, 1] == -1:  # upper right quadrant
+            mask = np.logical_and(points[0, :] >= 0, points[1, :] >= 0)
+            evaluated_mode[mask] *= -1
+        if quadrant_signs[1, 0] == -1:  # lower left quadrant
+            mask = np.logical_and(points[0, :] < 0, points[1, :] < 0)
+            evaluated_mode[mask] *= -1
+        if quadrant_signs[1, 1] == -1:  # lower right quadrant
+            mask = np.logical_and(points[0, :] >= 0, points[1, :] < 0)
+            evaluated_mode[mask] *= -1
+
+        return evaluated_mode
+
+    circle_mode.interpolate(interpolate)
+    return circle_mode
+
+
 @pytest.fixture
 def system():
     ka = 4.83
@@ -341,41 +379,12 @@ def test_solve_fixed_pump(system, system_quarter):
     ]
 
     # transform the modes on the quarter mesh to modes on the full mesh
-
-    dbc_mode = fem.Function(system.V)
-
-    def dbc_interpolate(points: np.ndarray) -> np.ndarray:
-        # points is a 3 x N matrix
-        quarter_mode = dbc_quarter_mode
-        eval_points = np.abs(points)
-        #  now eval quarter_mode at the eval_points and return the values
-        quarter_evaluator = algorithms.Evaluator(
-            system_quarter.V, system_quarter.msh, eval_points
-        )
-        emode = quarter_evaluator(quarter_mode)  # has shape (N,)
-        positive_sign_mask = np.logical_or(
-            np.logical_and(points[0, :] > 0, points[1, :] > 0),
-            np.logical_and(points[0, :] < 0, points[1, :] < 0),
-        )
-        emode[~positive_sign_mask] *= -1
-
-        return emode
-
-    dbc_mode.interpolate(dbc_interpolate)
-
-    nbc_mode = fem.Function(system.V)
-
-    def nbc_interpolate(points: np.ndarray) -> np.ndarray:
-        # points is a 3 x N matrix
-        quarter_mode = nbc_quarter_mode
-
-        eval_points = np.abs(points)
-        quarter_evaluator = algorithms.Evaluator(
-            system_quarter.V, system_quarter.msh, eval_points
-        )
-        return quarter_evaluator(quarter_mode)  # has shape (N,)
-
-    nbc_mode.interpolate(nbc_interpolate)
+    dbc_mode = map_function_to_circle_mesh(
+        dbc_quarter_mode, np.array([[-1, 1], [1, -1]]), system.V, system_quarter.V
+    )
+    nbc_mode = map_function_to_circle_mesh(
+        nbc_quarter_mode, np.array([[1, 1], [1, 1]]), system.V, system_quarter.V
+    )
 
     nbc_internal_intensity = fem.assemble_scalar(
         fem.form(abs(nbc_mode) ** 2 * system.dx_circle)
