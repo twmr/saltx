@@ -509,9 +509,10 @@ def test_solve_single_mode_D0range(system, system_quarter):
     active_modes = 1
 
     fem_mode = fem.Function(system.V)
+    internal_intensity_form = fem.form(abs(fem_mode) ** 2 * system.dx_circle)
 
     intensity_map = {}
-    # for D0 in np.linspace(0.1, 0.077, 8):
+    # for D0 in np.linspace(0.1, 0.076, 8):
     for D0 in np.linspace(0.1, 0.16, 8):
         D0_constant_circle.value = D0
         refined_modes = algorithms.refine_modes(
@@ -527,11 +528,9 @@ def test_solve_single_mode_D0range(system, system_quarter):
         assert all(rm.converged for rm in refined_modes)
         assert len(refined_modes) == 1
 
-        # determine internal intensity and compare it against the value from figure 7
+        # determine internal intensity and compare it with the value from figure 7
         fem_mode.x.array[:] = refined_modes[0].array
-        internal_intensity = fem.assemble_scalar(
-            fem.form(abs(fem_mode) ** 2 * system.dx_circle)
-        )
+        internal_intensity = fem.assemble_scalar(internal_intensity_form)
         assert internal_intensity.imag < 1e-15
         intensity_map[D0] = internal_intensity.real
 
@@ -545,6 +544,7 @@ def test_solve_single_mode_D0range(system, system_quarter):
                 dof_at_maximum=rmode.dof_at_maximum,
             )
         ]
+        # TODO check if the eigenvalue of a new mode is above the real axis
 
     assert intensity_map[0.1].real == pytest.approx(0.742, rel=1e-3)
 
