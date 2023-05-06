@@ -403,8 +403,9 @@ def test_solve_fixed_pump(system, system_quarter):
             ax.pcolormesh(
                 system.X,
                 system.Y,
-                abs(vals) ** 2,
-                vmin=0.0,
+                # abs(vals) ** 2,
+                vals.real,
+                # vmin=0.0,
             )
             ax.set_title(title)
         plt.show()
