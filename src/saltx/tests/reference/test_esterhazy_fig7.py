@@ -485,8 +485,6 @@ def test_solve_single_mode_D0range(system, system_quarter):
         dof_at_maximum=dof_at_maximum,
     )
 
-    # TODO do this till 0.15 where still only a single mode is lasing
-
     nlp = NonLinearProblem(
         system.V,
         system.ka,
