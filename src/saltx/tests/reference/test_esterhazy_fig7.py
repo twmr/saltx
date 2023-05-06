@@ -514,6 +514,7 @@ def test_solve_single_mode_D0range(system, system_quarter):
     intensity_map = {}
     # for D0 in np.linspace(0.1, 0.076, 8):
     for D0 in np.linspace(0.1, 0.16, 8):
+        log.info(f"--------> D0={D0}")
         D0_constant_circle.value = D0
         refined_modes = algorithms.refine_modes(
             minfos,
@@ -544,7 +545,56 @@ def test_solve_single_mode_D0range(system, system_quarter):
                 dof_at_maximum=rmode.dof_at_maximum,
             )
         ]
-        # TODO check if the eigenvalue of a new mode is above the real axis
+
+        if False:
+            # check if the eigenvalue of a new mode is above the real axis
+            nlp.update_b_and_k_for_forms(refined_modes)
+
+            # TODO don't call the NEVP solver for every D0, because the NEVP solver for
+            # the full circle system is computationally intensive.
+
+            Q_form = nlp.get_Q_hbt_form(nmodes=1)
+            _u = ufl.TrialFunction(system.V)
+            _v = ufl.TestFunction(system.V)
+
+            ctrl_modes = algorithms.get_nevp_modes(
+                algorithms.NEVPInputs(
+                    ka=system.ka,
+                    gt=system.gt,
+                    rg_params=system.rg_params,
+                    L=assemble_form(
+                        -inner(elem_mult(system.invperm, curl(_u)), curl(_v)) * dx, bcs
+                    ),
+                    M=assemble_form(system.dielec * inner(_u, _v) * dx, bcs, diag=0.0),
+                    N=None,
+                    Q=assemble_form(Q_form, bcs, diag=0.0),
+                    R=None,
+                    bcs=bcs,
+                )
+            )
+
+            ctrl_evals = np.asarray([cm.k for cm in ctrl_modes])
+
+            # TODO Try to decrease this threshold to at least 1e-9
+            real_axis_threshold = 2e-8
+            number_of_modes_close_to_real_axis = np.sum(
+                np.abs(ctrl_evals.imag) < real_axis_threshold
+            )
+            Print(
+                "Number of modes close to real axis: "
+                f"{number_of_modes_close_to_real_axis}"
+            )
+            # 2 degenerate modes are close to the real axis
+            assert number_of_modes_close_to_real_axis == 2
+
+            number_of_modes_above_real_axis = np.sum(
+                ctrl_evals.imag > real_axis_threshold
+            )
+            Print(f"Number of modes above real axis: {number_of_modes_above_real_axis}")
+
+            # this raises when D0 is close to the 2nd threshold (around 0.165 according
+            # to fig 7), but why does it raise before this threshold is reached?
+            assert number_of_modes_above_real_axis == 0
 
     assert intensity_map[0.1].real == pytest.approx(0.742, rel=1e-3)
 
