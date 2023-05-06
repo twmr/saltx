@@ -80,7 +80,7 @@ def system():
 
     dx_circle = ufl.Measure("dx", subdomain_data=mt_cells, domain=msh)(circle_meshtag)
 
-    V = fem.FunctionSpace(msh, ("Lagrange", 4))
+    V = fem.FunctionSpace(msh, ("Lagrange", 3))
 
     pml_start = 1.2
     pml_end = 1.8
