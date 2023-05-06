@@ -285,8 +285,8 @@ def solve_nevp_wrapper(
     return all_modes, evals
 
 
-def test_solve_fixed_pump(system, system_quarter):
-    """Determine the lasing mode at D0=0.1."""
+def test_solve_single_mode_D0range(system, system_quarter):
+    """Determine the lasing mode starting at D0=0.1."""
     # For solving the NEVP we use the quarter circle mesh with different boundary
     # conditions. We then refine a circulating mode with Im(k) > 0 s.t. it reaches the
     # real axis. The mode-refining is done using the full-circle mesh, because a
@@ -516,40 +516,50 @@ def test_solve_fixed_pump(system, system_quarter):
         )
     ]
     active_modes = 1
-    refined_modes = algorithms.refine_modes(
-        minfos,
-        mode.bcs,
-        newton_operators[active_modes].solver,
-        nlp,
-        newton_operators[active_modes].A,
-        newton_operators[active_modes].L,
-        newton_operators[active_modes].delta_x,
-        newton_operators[active_modes].initial_x,
-    )
-    assert all(rm.converged for rm in refined_modes)
-    assert len(refined_modes) == 1
-
-    # determine internal intensity and compare it against the value from figure 7
 
     fem_mode = fem.Function(system.V)
-    fem_mode.x.array[:] = refined_modes[0].array
-    internal_intensity = fem.assemble_scalar(
-        fem.form(abs(fem_mode) ** 2 * system.dx_circle)
-    )
-    assert internal_intensity.imag < 1e-15
-    assert internal_intensity.real == pytest.approx(0.742, rel=1e-3)
 
+    intensity_map = {}
+    # for D0 in np.linspace(0.1, 0.077, 8):
+    for D0 in np.linspace(0.1, 0.16, 8):
+        D0_constant_circle.value = D0
+        refined_modes = algorithms.refine_modes(
+            minfos,
+            mode.bcs,
+            newton_operators[active_modes].solver,
+            nlp,
+            newton_operators[active_modes].A,
+            newton_operators[active_modes].L,
+            newton_operators[active_modes].delta_x,
+            newton_operators[active_modes].initial_x,
+        )
+        assert all(rm.converged for rm in refined_modes)
+        assert len(refined_modes) == 1
 
-def test_plot():
+        # determine internal intensity and compare it against the value from figure 7
+        fem_mode.x.array[:] = refined_modes[0].array
+        internal_intensity = fem.assemble_scalar(
+            fem.form(abs(fem_mode) ** 2 * system.dx_circle)
+        )
+        assert internal_intensity.imag < 1e-15
+        intensity_map[D0] = internal_intensity.real
+
+        rmode = refined_modes[0]
+        minfos = [
+            newtils.NewtonModeInfo(
+                k=rmode.k.real,
+                s=rmode.s,
+                re_array=rmode.array.real / rmode.s,
+                im_array=rmode.array.imag / rmode.s,
+                dof_at_maximum=rmode.dof_at_maximum,
+            )
+        ]
+
+    assert intensity_map[0.1].real == pytest.approx(0.742, rel=1e-3)
+
     fig, ax = plt.subplots()
     refdata = np.loadtxt("./data/figures/esterhazy_fig7/mode1.csv", delimiter=",")
     ax.plot(refdata[:, 0], refdata[:, 1], "x")
-
-    # my results
-    ax.plot(
-        [0.08, 0.1, 0.13339275245890964, 0.15946653060338278],
-        [0.14217403550027424, 0.7422087350381327, 1.785008156714247, 2.626127947527164],
-        "-o",
-    )
+    ax.plot(list(intensity_map.keys()), list(intensity_map.values()), "-o")
 
     plt.show()
