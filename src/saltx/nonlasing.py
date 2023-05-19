@@ -201,39 +201,35 @@ class NonLasingLinearProblem:
         k = self.k_constant
 
         gammak = gt / (k - ka + 1j * gt)
+        dgammak_dk = -gt / (k - ka + 1j * gt) ** 2
 
+        # vector:
         u = ufl.TrialFunction(self.V)
         formL = inner(mult(invperm, curl(u)), curl(ufl.conj(b))) * dx
         M = dielec * inner(u, ufl.conj(b)) * dx
         Q = pump * inner(u, ufl.conj(b)) * dx
 
         Sb = -formL + k**2 * M + k**2 * gammak * Q
+        dFdk = 2 * k * M + 2 * k * gammak * Q + k**2 * dgammak_dk * Q
+
         if self.ds_obc is not None:
             R = inner(u, ufl.conj(b)) * self.ds_obc
             Sb += 1j * k * R
+            dFdk += 1j * R
+
         if self.sigma_c is not None:
             N = self.sigma_c * inner(u, ufl.conj(b)) * dx
             Sb += 1j * k * N
-        with Timer(print, "fem.form(Sb)"):
-            self.form_Sb = fem.form(Sb)
-
-        v = ufl.TestFunction(self.V)
-
-        L = inner(mult(invperm, curl(u)), curl(ufl.conj(b))) * dx
-        M = dielec * inner(u, ufl.conj(b)) * dx
-        Q = pump * inner(u, ufl.conj(b)) * dx
-
-        # Sb = -L + 1j * k * R + k**2 * M + 1j * k * N + k**2 * gammak * Q
-        dgammak_dk = -gt / (k - ka + 1j * gt) ** 2
-
-        dFdk = 2 * k * M + 2 * k * gammak * Q + k**2 * dgammak_dk * Q
-        if self.ds_obc is not None:
-            R = inner(u, ufl.conj(b)) * self.ds_obc
-            dFdk += 1j * R
-        if self.sigma_c is not None:
-            N = self.sigma_c * inner(u, ufl.conj(b)) * dx
             dFdk += 1j * N
 
+        with Timer(print, "fem.form(Sb)"):
+            # Sb = -L + 1j * k * R + k**2 * M + 1j * k * N + k**2 * gammak * Q
+            self.form_Sb = fem.form(Sb)
+        with Timer(print, "fem.form(dFdk)"):
+            self.form_dFdk = fem.form(dFdk)
+
+        # matrix:
+        v = ufl.TestFunction(self.V)
         L = inner(mult(invperm, curl(u)), curl(v)) * dx
         M = dielec * inner(u, v) * dx
         Q = pump * inner(u, v) * dx
@@ -246,7 +242,6 @@ class NonLasingLinearProblem:
             N = self.sigma_c * inner(u, v) * dx
             dFdu += 1j * k * N
 
-        self.form_dFdk = fem.form(dFdk)
         self.form_dFdu = fem.form(dFdu)
 
     def create_A(self, n_fem):
