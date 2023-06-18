@@ -3,7 +3,6 @@
 # This file is part of saltx (https://github.com/thisch/saltx)
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
-
 """Calculate the NEVP modes (fixed pump) of a micro-disk laser and use analytic
 results to check that their numerical eigenvalues are accurate.
 

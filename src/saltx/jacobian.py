@@ -16,7 +16,7 @@ log = logging.getLogger(__name__)
 
 
 def create_salt_jacobian_block_matrix(dF_dvw: PETSc.Mat, nmodes: int = 1) -> PETSc.Mat:
-    """creates matrix with the expected sparsity structure but doesn't fill it
+    """Creates matrix with the expected sparsity structure but doesn't fill it
     with values."""
     # CSR matrix example:
     # Input : 0  0  0  0
