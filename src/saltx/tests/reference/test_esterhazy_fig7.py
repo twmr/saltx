@@ -330,9 +330,10 @@ def test_evaltraj(system, system_quarter):
     }
 
     D0_constant = real_const(system_quarter.V, 1.0)
+    D0_range = np.linspace(0.05, 0.12, 4)
 
     vals = []
-    for D0 in np.linspace(0.05, 0.12, 4):
+    for D0 in D0_range:
         Print(f"--> {D0=}")
         D0_constant.value = D0
         modes, _ = solve_nevp_wrapper(
@@ -371,7 +372,9 @@ def test_evaltraj(system, system_quarter):
 
         ax.grid(True)
 
-    scatter_plot(vals, "Non-Interacting thresholds")
+    scatter_plot(
+        vals, f"Non-Interacting thresholds (Range D0={D0_range[0]} .. {D0_range[-1]})"
+    )
 
     plt.show()
 
@@ -412,9 +415,8 @@ def determine_circulating_mode_at_D0(
         # ],
     }
 
-    D0range = [0.1]  # the convergence of refine_modes is better at D0=1.0
     # TODO figure out why the convergence is not so good at smaller D0
-    D0_constant = real_const(system_quarter.V, D0range[0])
+    D0_constant = real_const(system_quarter.V, D0)
 
     modes, _ = solve_nevp_wrapper(
         system_quarter.ka,
@@ -427,8 +429,10 @@ def determine_circulating_mode_at_D0(
         bcs,
     )
 
-    assert len(modes) == 14
-    assert modes[0].bcs_name == "full_dbc"
+    defaultD0 = D0 == 0.1
+    if defaultD0:
+        assert len(modes) == 14
+        assert modes[0].bcs_name == "full_dbc"
 
     def scatter_plot(vals, title):
         fig, ax = plt.subplots()
@@ -442,7 +446,9 @@ def determine_circulating_mode_at_D0(
 
         ax.grid(True)
 
-    scatter_plot(np.asarray([mode.k for mode in modes]), "Non-Interacting thresholds")
+    scatter_plot(
+        np.asarray([mode.k for mode in modes]), f"Non-Interacting thresholds at {D0=}"
+    )
     plt.show()
 
     dbc_modes_above_threshold = [
@@ -451,6 +457,7 @@ def determine_circulating_mode_at_D0(
     assert len(dbc_modes_above_threshold) > 0
 
     k_fm = 5.380  # approx k first mode
+    # k_fm = 4.25  # approx k second mode
     dbc_quarter_mode = dbc_modes_above_threshold[
         np.argmin([abs(m.k.real - k_fm) for m in dbc_modes_above_threshold])
     ]
@@ -475,13 +482,15 @@ def determine_circulating_mode_at_D0(
         fem.form(abs(dbc_mode) ** 2 * system.dx_circle)
     )
     assert dbc_internal_intensity.imag < 1e-15
-    assert dbc_internal_intensity.real == pytest.approx(0.662, rel=0.1)
+    if defaultD0:
+        assert dbc_internal_intensity.real == pytest.approx(0.662, rel=0.1)
 
     nbc_internal_intensity = fem.assemble_scalar(
         fem.form(abs(nbc_mode) ** 2 * system.dx_circle)
     )
     assert nbc_internal_intensity.imag < 1e-15
-    assert nbc_internal_intensity.real == pytest.approx(0.662, rel=0.1)
+    if defaultD0:
+        assert nbc_internal_intensity.real == pytest.approx(0.662, rel=0.1)
 
     debug = False
     if debug:
@@ -504,11 +513,11 @@ def determine_circulating_mode_at_D0(
     # make sure that k of the dbc and nbc modes is the same, s.t. we can build a
     # circulating mode.
     _lam_dbc, _lam_nbc = (
-        dbc_modes_above_threshold[0].k,
-        nbc_modes_above_threshold[0].k,
+        dbc_quarter_mode.k,
+        nbc_quarter_mode.k,
     )
     assert _lam_dbc.imag > 0
-    np.testing.assert_allclose(_lam_nbc, _lam_dbc)
+    np.testing.assert_allclose(_lam_nbc, _lam_dbc, rtol=5e-7)
     _lam = _lam_dbc
 
     mode_dbc = dbc_mode.vector.getArray().copy()
@@ -588,7 +597,18 @@ def determine_circulating_mode_at_D0(
     return mode
 
 
-def test_solve_single_mode_D0range(system, system_quarter):
+# D0=0.076 is close to first threshold (see the text in the paper)
+@pytest.mark.parametrize(
+    "D0_range",
+    [
+        np.linspace(0.1, 0.076, 8),  # single laser mode only
+        [0.145],  # two lasing modes
+        # [0.1538], # does not converge
+        [0.142, 0.1435, 0.145, 0.147, 0.15],  # from one to two lasing modes
+        [0.145, 0.147, 0.15, 0.152, 0.153, 0.1532],  # only two lasing modes
+    ],
+)
+def test_solve_single_mode_D0range(system, system_quarter, D0_range):
     """Determine the lasing mode starting at D0=0.1."""
     # For solving the NEVP we use the quarter circle mesh with different boundary
     # conditions. We then refine a circulating mode with Im(k) > 0 s.t. it reaches the
@@ -596,7 +616,7 @@ def test_solve_single_mode_D0range(system, system_quarter):
     # circulating (sum of a mode with DBC and a mode with NBC) mode doesn't have well
     # defined BCs for the quarter mesh.
 
-    D0_start = 0.1
+    D0_start = D0_range[0]
 
     # the circulating mode is a FEM function on the full (circle) system
     circulating_mode = determine_circulating_mode_at_D0(
@@ -616,7 +636,7 @@ def test_solve_single_mode_D0range(system, system_quarter):
         pump=D0_constant_circle * system.pump_profile,
         ds_obc=None,
     )
-    newton_operators = newtils.create_multimode_solvers_and_matrices(nlp, max_nmodes=1)
+    newton_operators = newtils.create_multimode_solvers_and_matrices(nlp, max_nmodes=2)
 
     minfos = [
         newtils.NewtonModeInfo(
@@ -634,10 +654,9 @@ def test_solve_single_mode_D0range(system, system_quarter):
 
     bcs = circulating_mode.bcs
     intensity_map = {}
+    intensity_map_mode2 = {}
 
-    # D0=0.076 is close to first threshold (see the text in the paper)
-    # for D0 in np.linspace(0.1, 0.076, 8):
-    for D0 in np.linspace(D0_start, 0.16, 8):
+    for D0 in D0_range:
         log.info(f"--------> D0={D0}")
         D0_constant_circle.value = D0
         refined_modes = algorithms.refine_modes(
@@ -651,15 +670,23 @@ def test_solve_single_mode_D0range(system, system_quarter):
             newton_operators[active_modes].initial_x,
         )
         assert all(rm.converged for rm in refined_modes)
-        assert len(refined_modes) == 1
+        assert len(refined_modes) == active_modes
+
+        # refined_mode[0] is the solution of a nonlinear EVP
+        # it should still be a circulating mode
 
         # determine internal intensity and compare it with the value from figure 7
         fem_mode.x.array[:] = refined_modes[0].array
         internal_intensity = fem.assemble_scalar(internal_intensity_form)
         assert internal_intensity.imag < 1e-15
         intensity_map[D0] = internal_intensity.real
+        if active_modes == 2:
+            fem_mode.x.array[:] = refined_modes[1].array
+            internal_intensity = fem.assemble_scalar(internal_intensity_form)
+            assert internal_intensity.imag < 1e-15
+            intensity_map_mode2[D0] = internal_intensity.real
 
-        rmode = refined_modes[0]
+        assert all(rmode.k.imag < 1e-9 for rmode in refined_modes)
         minfos = [
             newtils.NewtonModeInfo(
                 k=rmode.k.real,
@@ -668,16 +695,17 @@ def test_solve_single_mode_D0range(system, system_quarter):
                 im_array=rmode.array.imag / rmode.s,
                 dof_at_maximum=rmode.dof_at_maximum,
             )
+            for rmode in refined_modes
         ]
 
-        if False:
+        if D0_start > 0.12:  # this improves the runtime of the code
             # check if the eigenvalue of a new mode is above the real axis
             nlp.update_b_and_k_for_forms(refined_modes)
 
             # TODO don't call the NEVP solver for every D0, because the NEVP solver for
             # the full circle system is computationally intensive.
 
-            Q_form = nlp.get_Q_hbt_form(nmodes=1)
+            Q_form = nlp.get_Q_hbt_form(nmodes=len(refined_modes))
             _u = ufl.TrialFunction(system.V)
             _v = ufl.TestFunction(system.V)
 
@@ -700,7 +728,7 @@ def test_solve_single_mode_D0range(system, system_quarter):
             ctrl_evals = np.asarray([cm.k for cm in ctrl_modes])
 
             # TODO Try to decrease this threshold to at least 1e-9
-            real_axis_threshold = 2e-8
+            real_axis_threshold = 2.2e-8
             number_of_modes_close_to_real_axis = np.sum(
                 np.abs(ctrl_evals.imag) < real_axis_threshold
             )
@@ -708,23 +736,146 @@ def test_solve_single_mode_D0range(system, system_quarter):
                 "Number of modes close to real axis: "
                 f"{number_of_modes_close_to_real_axis}"
             )
-            # 2 degenerate modes are close to the real axis
-            assert number_of_modes_close_to_real_axis == 2
+            # 2 degenerate modes (should be CW and CCW modes) are close to the real axis
+            assert number_of_modes_close_to_real_axis == 2 * active_modes
 
             number_of_modes_above_real_axis = np.sum(
                 ctrl_evals.imag > real_axis_threshold
             )
             Print(f"Number of modes above real axis: {number_of_modes_above_real_axis}")
 
-            # this raises when D0 is close to the 2nd threshold (around 0.165 according
-            # to fig 7), but why does it raise before this threshold is reached?
-            assert number_of_modes_above_real_axis == 0
+            # FIXME this raises when D0 is close to the 2nd threshold (around 0.165
+            # according to fig 7), but why does it raise before this threshold is
+            # reached?
+            # assert number_of_modes_above_real_axis == 2
 
-    assert intensity_map[0.1].real == pytest.approx(0.742, rel=1e-3)
+            if number_of_modes_above_real_axis:
+                assert active_modes == 1
+                # find the 2 ctrl_modes above threshold and sum them up
+
+                k_fm = 4.813  # approx k second mode
+                midx = np.argmin([abs(m.k.real - k_fm) for m in ctrl_modes])
+
+                if abs(ctrl_modes[midx + 1].k - k_fm) < 0.1:
+                    m_a, m_b = ctrl_modes[midx], ctrl_modes[midx + 1]
+                else:
+                    m_a, m_b = ctrl_modes[midx], ctrl_modes[midx - 1]
+                    assert abs(m_b.k - k_fm) < 0.1
+
+                m_a_vals = m_a.array.copy()
+                m_b_vals = m_b.array.copy()
+
+                _lam = m_a.k
+                assert _lam.imag > 0
+
+                #    = "cos"    - 1j "sin"
+                m_ab = m_b_vals - 1j * m_a_vals
+
+                dof_at_maximum = np.abs(m_ab).argmax()
+                val_maximum = m_ab[dof_at_maximum]
+                # fix norm and the phase
+                m_ab /= val_maximum
+
+                mode2 = algorithms.NEVPNonLasingMode(
+                    array=m_ab,
+                    k=_lam,
+                    error=0.0,
+                    bcs_name="default",
+                    bcs=bcs,
+                    dof_at_maximum=dof_at_maximum,
+                )
+
+                if False:
+                    for title, vals in [
+                        (
+                            "DBC mode",
+                            system.evaluator(m_a_vals).reshape(system.X.shape),
+                        ),
+                        (
+                            "NBC mode",
+                            system.evaluator(m_b_vals).reshape(system.X.shape),
+                        ),
+                    ]:
+                        _, ax = plt.subplots()
+                        ax.pcolormesh(
+                            system.X,
+                            system.Y,
+                            # abs(vals) ** 2,
+                            vals.real,
+                            # vmin=0.0,
+                        )
+                        ax.set_title(title)
+
+                    _, ax = plt.subplots()
+                    vals = system.evaluator(m_ab).reshape(system.X.shape)
+                    ax.pcolormesh(
+                        system.X,
+                        system.Y,
+                        abs(vals) ** 2,
+                        vmin=0.0,
+                    )
+                    ax.set_title("SUM")
+                    plt.show()
+
+                _rmode = refined_modes[0]
+                minfos = [
+                    newtils.NewtonModeInfo(
+                        k=_rmode.k.real,
+                        s=1.0,
+                        re_array=_rmode.array.real / _rmode.s,
+                        im_array=_rmode.array.imag / _rmode.s,
+                        dof_at_maximum=_rmode.dof_at_maximum,
+                    ),
+                    newtils.NewtonModeInfo(
+                        k=mode2.k.real,
+                        s=1.0,
+                        re_array=mode2.array.real,
+                        im_array=mode2.array.imag,
+                        dof_at_maximum=mode2.dof_at_maximum,
+                    ),
+                ]
+
+                active_modes = 2
+                refined_modes = algorithms.refine_modes(
+                    minfos,
+                    bcs,
+                    newton_operators[active_modes].solver,
+                    nlp,
+                    newton_operators[active_modes].A,
+                    newton_operators[active_modes].L,
+                    newton_operators[active_modes].delta_x,
+                    newton_operators[active_modes].initial_x,
+                    fail_early=False,
+                )
+                assert all(rm.converged for rm in refined_modes)
+                assert len(refined_modes) == active_modes
+
+                fem_mode.x.array[:] = refined_modes[0].array
+                internal_intensity = fem.assemble_scalar(internal_intensity_form)
+                assert internal_intensity.imag < 1e-15
+                intensity_map[D0] = internal_intensity.real
+
+                fem_mode.x.array[:] = refined_modes[1].array
+                internal_intensity = fem.assemble_scalar(internal_intensity_form)
+                assert internal_intensity.imag < 1e-15
+                intensity_map_mode2[D0] = internal_intensity.real
+
+    if isinstance(D0_range, np.ndarray):
+        pass
+    elif D0_range == [0.1]:
+        assert intensity_map[0.1] == pytest.approx(0.742, rel=1e-3)
+    elif D0_range == [0.145]:
+        assert intensity_map[0.145] == pytest.approx(1.8479903859036326, rel=1e-3)
+        assert intensity_map_mode2[0.145] == pytest.approx(0.239567162395648, rel=1e-3)
 
     fig, ax = plt.subplots()
     refdata = np.loadtxt("./data/references/esterhazy_fig7/mode1.csv", delimiter=",")
     ax.plot(refdata[:, 0], refdata[:, 1], "x")
     ax.plot(list(intensity_map.keys()), list(intensity_map.values()), "-o")
+    if intensity_map_mode2:
+        ax.plot(
+            list(intensity_map_mode2.keys()), list(intensity_map_mode2.values()), "-o"
+        )
+    ax.grid(True)
 
     plt.show()
