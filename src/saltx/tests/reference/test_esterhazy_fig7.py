@@ -376,14 +376,9 @@ def test_evaltraj(system, system_quarter):
     plt.show()
 
 
-def test_solve_single_mode_D0range(system, system_quarter):
-    """Determine the lasing mode starting at D0=0.1."""
-    # For solving the NEVP we use the quarter circle mesh with different boundary
-    # conditions. We then refine a circulating mode with Im(k) > 0 s.t. it reaches the
-    # real axis. The mode-refining is done using the full-circle mesh, because a
-    # circulating (sum of a mode with DBC and a mode with NBC) mode doesn't have well
-    # defined BCs for the quarter mesh.
-
+def determine_circulating_mode_at_D0(
+    system, system_quarter, D0: float
+) -> tuple[complex, algorithms.NEVPNonLasingMode]:
     def on_outer_boundary(x):
         return np.isclose(x[0], system_quarter.pml_end) | np.isclose(
             x[1], system_quarter.pml_end
@@ -398,6 +393,7 @@ def test_solve_single_mode_D0range(system, system_quarter):
         # at the outer pml we impose DBC but at the symmetry axes we impose NBC.
         on_outer_boundary,
     )
+    # TODO explain why we don't solve the NEVP using mixed symmetry bcs
     # bcs_dofs_mixed = fem.locate_dofs_geometrical(
     #     system_quarter.V,
     #     # DBC at x-axis, NBC at y-axis
@@ -416,11 +412,9 @@ def test_solve_single_mode_D0range(system, system_quarter):
         # ],
     }
 
-    # D0range = [0.076]  # close to first threshold (see the text in the paper)
     D0range = [0.1]  # the convergence of refine_modes is better at D0=1.0
     # TODO figure out why the convergence is not so good at smaller D0
     D0_constant = real_const(system_quarter.V, D0range[0])
-    D0_constant_circle = real_const(system.V, D0range[0])
 
     modes, _ = solve_nevp_wrapper(
         system_quarter.ka,
@@ -579,11 +573,7 @@ def test_solve_single_mode_D0range(system, system_quarter):
     # fix norm and the phase
     mode /= val_maximum
 
-    def on_outer_boundary(x):
-        return np.isclose(abs(x[0]), system.pml_end) | np.isclose(
-            abs(x[1]), system.pml_end
-        )
-
+    # we don't need any dirichlet BCs because our domain is a rectangle with a PML.
     bcs = []
 
     mode = algorithms.NEVPNonLasingMode(
@@ -594,6 +584,27 @@ def test_solve_single_mode_D0range(system, system_quarter):
         bcs=bcs,
         dof_at_maximum=dof_at_maximum,
     )
+
+    return mode
+
+
+def test_solve_single_mode_D0range(system, system_quarter):
+    """Determine the lasing mode starting at D0=0.1."""
+    # For solving the NEVP we use the quarter circle mesh with different boundary
+    # conditions. We then refine a circulating mode with Im(k) > 0 s.t. it reaches the
+    # real axis. The mode-refining is done using the full-circle mesh, because a
+    # circulating (sum of a mode with DBC and a mode with NBC) mode doesn't have well
+    # defined BCs for the quarter mesh.
+
+    D0_start = 0.1
+
+    # the circulating mode is a FEM function on the full (circle) system
+    circulating_mode = determine_circulating_mode_at_D0(
+        system, system_quarter, D0=D0_start
+    )
+
+    arbitrary_default_value = 100.200300
+    D0_constant_circle = real_const(system.V, arbitrary_default_value)
 
     nlp = NonLinearProblem(
         system.V,
@@ -609,11 +620,11 @@ def test_solve_single_mode_D0range(system, system_quarter):
 
     minfos = [
         newtils.NewtonModeInfo(
-            k=mode.k.real,
+            k=circulating_mode.k.real,
             s=1.0,
-            re_array=mode.array.real,
-            im_array=mode.array.imag,
-            dof_at_maximum=mode.dof_at_maximum,
+            re_array=circulating_mode.array.real,
+            im_array=circulating_mode.array.imag,
+            dof_at_maximum=circulating_mode.dof_at_maximum,
         )
     ]
     active_modes = 1
@@ -621,9 +632,12 @@ def test_solve_single_mode_D0range(system, system_quarter):
     fem_mode = fem.Function(system.V)
     internal_intensity_form = fem.form(abs(fem_mode) ** 2 * system.dx_circle)
 
+    bcs = circulating_mode.bcs
     intensity_map = {}
+
+    # D0=0.076 is close to first threshold (see the text in the paper)
     # for D0 in np.linspace(0.1, 0.076, 8):
-    for D0 in np.linspace(0.1, 0.16, 8):
+    for D0 in np.linspace(D0_start, 0.16, 8):
         log.info(f"--------> D0={D0}")
         D0_constant_circle.value = D0
         refined_modes = algorithms.refine_modes(
