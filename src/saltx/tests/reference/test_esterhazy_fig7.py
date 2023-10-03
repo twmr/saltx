@@ -484,7 +484,7 @@ def test_solve_single_mode_D0range(system, system_quarter):
         plt.show()
 
     dof_at_maximum = np.abs(mode).argmax()
-    val_maximum = mode[np.abs(mode).argmax()]
+    val_maximum = mode[dof_at_maximum]
     # fix norm and the phase
     mode /= val_maximum
 
