@@ -386,6 +386,12 @@ def test_solve_single_mode_D0range(system, system_quarter):
         nbc_quarter_mode, np.array([[1, 1], [1, 1]]), system.V, system_quarter.V
     )
 
+    dbc_internal_intensity = fem.assemble_scalar(
+        fem.form(abs(dbc_mode) ** 2 * system.dx_circle)
+    )
+    assert dbc_internal_intensity.imag < 1e-15
+    assert dbc_internal_intensity.real == pytest.approx(0.662, rel=0.1)
+
     nbc_internal_intensity = fem.assemble_scalar(
         fem.form(abs(nbc_mode) ** 2 * system.dx_circle)
     )
@@ -410,8 +416,15 @@ def test_solve_single_mode_D0range(system, system_quarter):
             ax.set_title(title)
         plt.show()
 
-    _lam = dbc_modes_above_threshold[0].k
-    assert _lam.imag > 0
+    # make sure that k of the dbc and nbc modes is the same, s.t. we can build a
+    # circulating mode.
+    _lam_dbc, _lam_nbc = (
+        dbc_modes_above_threshold[0].k,
+        nbc_modes_above_threshold[0].k,
+    )
+    assert _lam_dbc.imag > 0
+    np.testing.assert_allclose(_lam_nbc, _lam_dbc)
+    _lam = _lam_dbc
 
     mode_dbc = dbc_mode.vector.getArray().copy()
     mode_nbc = nbc_mode.vector.getArray().copy()
