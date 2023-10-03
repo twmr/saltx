@@ -452,29 +452,35 @@ def test_solve_single_mode_D0range(system, system_quarter):
         #     #abs(vals) ** 2,
         #     # vmin=0.0,
         # )
-        ax.plot(system.phi - np.pi, abs(vals) ** 2)
 
-        vals = system.evaluator_circle(mode_dbc)  # .reshape(system.X.shape)
-        _, ax = plt.subplots()
-        # ax.pcolormesh(
-        #     system.X,
-        #     system.Y,
-        #     # vals.real,
-        #     abs(vals) ** 2,
-        #     vmin=0.0,
-        # )
+        # The intensity fluctuates a tiny bit
         ax.plot(system.phi - np.pi, abs(vals) ** 2)
+        ax.set_ylim(0, 1.0)
+        ax.set_title("mode")
 
-        vals = system.evaluator_circle(mode_nbc)  # .reshape(system.X.shape)
+        vals_dbc = system.evaluator_circle(mode_dbc)
+        vals_nbc = system.evaluator_circle(mode_nbc)
+
         _, ax = plt.subplots()
-        # ax.pcolormesh(
-        #     system.X,
-        #     system.Y,
-        #     # vals.real,
-        #     abs(vals) ** 2,
-        #     vmin=0.0,
-        # )
-        ax.plot(system.phi - np.pi, abs(vals) ** 2)
+        ax.plot(system.phi - np.pi, abs(vals_nbc.real - 1j * vals_dbc.real) ** 2)
+        ax.set_ylim(0, 1.0)
+        ax.set_title("nbc-1jdbc")
+
+        _, ax = plt.subplots()
+        ax.plot(system.phi - np.pi, abs(vals_nbc) ** 2, label="intens nbc")
+        ax.plot(system.phi - np.pi, abs(vals_dbc) ** 2, label="intens dbc")
+        ax.legend()
+
+        _, ax = plt.subplots()
+        ax.plot(system.phi - np.pi, vals_nbc.real, label="real nbc")
+        ax.plot(system.phi - np.pi, vals_dbc.real, label="real dbc")
+        ax.legend()
+
+        _, ax = plt.subplots()
+        ax.plot(system.phi - np.pi, np.angle(vals_nbc), label="phase nbc")
+        ax.plot(system.phi - np.pi, np.angle(vals_dbc), label="phase dbc")
+        ax.legend()
+
         plt.show()
 
     dof_at_maximum = np.abs(mode).argmax()
