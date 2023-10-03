@@ -285,6 +285,97 @@ def solve_nevp_wrapper(
     return all_modes, evals
 
 
+def test_evaltraj(system, system_quarter):
+    """Determine the complex eigenvalues of the modes without a hole burning
+    term."""
+
+    def on_outer_boundary(x):
+        return np.isclose(x[0], system_quarter.pml_end) | np.isclose(
+            x[1], system_quarter.pml_end
+        )
+
+    bcs_dofs_dbc = fem.locate_dofs_geometrical(
+        system_quarter.V,
+        lambda x: np.isclose(x[0], 0) | np.isclose(x[1], 0) | on_outer_boundary(x),
+    )
+    bcs_dofs_nbc = fem.locate_dofs_geometrical(
+        system_quarter.V,
+        # at the outer pml we impose DBC but at the symmetry axes we impose NBC.
+        on_outer_boundary,
+    )
+    bcs_dofs_mixed1 = fem.locate_dofs_geometrical(
+        system_quarter.V,
+        # DBC at x-axis, NBC at y-axis
+        lambda x: np.isclose(x[1], 0) | on_outer_boundary(x),
+    )
+    bcs_dofs_mixed2 = fem.locate_dofs_geometrical(
+        system_quarter.V,
+        # DBC at y-axis, NBC at x-axis
+        lambda x: np.isclose(x[0], 0) | on_outer_boundary(x),
+    )
+
+    bcs = {
+        "full_dbc": [
+            fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs_dbc, system_quarter.V),
+        ],
+        "full_nbc": [
+            fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs_nbc, system_quarter.V),
+        ],
+        "mixed1": [
+            fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs_mixed1, system_quarter.V),
+        ],
+        "mixed2": [
+            fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs_mixed2, system_quarter.V),
+        ],
+    }
+
+    D0_constant = real_const(system_quarter.V, 1.0)
+
+    vals = []
+    for D0 in np.linspace(0.05, 0.12, 4):
+        Print(f"--> {D0=}")
+        D0_constant.value = D0
+        modes, _ = solve_nevp_wrapper(
+            system_quarter.ka,
+            system_quarter.gt,
+            system_quarter.rg_params,
+            system_quarter.V,
+            system_quarter.invperm,
+            system_quarter.dielec,
+            D0_constant * system_quarter.pump_profile,
+            bcs,
+        )
+        evals = np.asarray([m.k for m in modes])
+        vals.append(np.vstack([D0 * np.ones(evals.shape), evals]).T)
+
+    def scatter_plot(vals, title):
+        fig, ax = plt.subplots()
+        fig.suptitle(title)
+
+        merged = np.vstack(vals)
+        X, Y, C = (
+            merged[:, 1].real,
+            merged[:, 1].imag,
+            merged[:, 0].real,
+        )
+        norm = plt.Normalize(C.min(), C.max())
+
+        sc = ax.scatter(X, Y, c=C, norm=norm)
+        ax.set_xlabel("k.real")
+        ax.set_ylabel("k.imag")
+
+        cbar = fig.colorbar(sc, ax=ax)
+        cbar.set_label("D0", loc="top")
+
+        plot_ellipse(ax, system_quarter.rg_params)
+
+        ax.grid(True)
+
+    scatter_plot(vals, "Non-Interacting thresholds")
+
+    plt.show()
+
+
 def test_solve_single_mode_D0range(system, system_quarter):
     """Determine the lasing mode starting at D0=0.1."""
     # For solving the NEVP we use the quarter circle mesh with different boundary
