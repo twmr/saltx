@@ -8,6 +8,8 @@ initio laser theory".
 
 See https://link.aps.org/doi/10.1103/PhysRevA.90.023816.
 """
+import dataclasses
+import itertools
 import sys
 from collections import namedtuple
 from logging import getLogger
@@ -35,19 +37,41 @@ Print = PETSc.Sys.Print
 
 log = getLogger(__name__)
 
+# k of approx laser modes
+Ka = 5.38
+Kb = 4.8
+Kc = 4.25
+Kd = 5.92
+allK = [Ka, Kb, Kc, Kd]
+
+# we use m.k.imag > eval_threshold to avoid refining a mode that is exactly at or very
+# close to the threshold
+eval_threshold = 1e-8
+# TODO Try to decrease this threshold to at least 1e-9
+real_axis_threshold = 5e-8
+
 
 def real_const(V, real_value: float) -> fem.Constant:
     return fem.Constant(V.mesh, complex(real_value, 0))
 
 
+# needed for mapping quadrant modes to a circle mode
+quadrant_signs_for_bcs = {
+    "full_dbc": np.array([[-1, 1], [1, -1]]),
+    "full_nbc": np.array([[1, 1], [1, 1]]),
+    "mixed1": np.array([[1, 1], [-1, -1]]),
+    "mixed2": np.array([[-1, 1], [-1, 1]]),
+}
+
+
 def map_function_to_circle_mesh(
     mode_on_quarter_circle: algorithms.NEVPNonLasingMode,
-    quadrant_signs: np.ndarray,
     V_circle,
     V_quarter_circle,
 ) -> fem.Function:
     """Creates a full-circle FEM func from a quarter-circle func with BCS."""
     circle_mode = fem.Function(V_circle)
+    quadrant_signs = quadrant_signs_for_bcs[mode_on_quarter_circle.bcs_name]
 
     def interpolate(points: np.ndarray) -> np.ndarray:
         # `points` is a 3 x N matrix
@@ -282,7 +306,64 @@ def solve_nevp_wrapper(
             )
         )
     evals = np.asarray([mode.k for mode in all_modes])
+
+    sorted_evals = np.sort_complex(evals)
+    Print("lam (including all bcs)")
+    Print("        lam     ")
+    Print("-----------------")
+    for _lam in sorted_evals:
+        Print(f" {_lam.real:9f}{_lam.imag:+9f} j")
+
+    Print("lam (including all bcs) above real axis")
+    Print("        lam     ")
+    Print("-----------------")
+    for _lam in sorted_evals:
+        if _lam.imag < 0:
+            continue
+        Print(f" {_lam.real:9f}{_lam.imag:+9f} j")
+
     return all_modes, evals
+
+
+@dataclasses.dataclass()
+class ModePair:
+    k: complex
+    k_rel_err: float
+    mode1: algorithms.NEVPNonLasingMode
+    mode2: algorithms.NEVPNonLasingMode
+
+
+def find_pairs(
+    modes_above_threshold,
+    rel_k_distance: float = 1e-7,
+    check_bcs_name: bool = True,
+):
+    # group the ones with close k together
+    for mode1, mode2 in itertools.combinations(modes_above_threshold, 2):
+        k_rel_err = abs(mode1.k - mode2.k) / abs(mode1.k)
+        if k_rel_err < rel_k_distance:
+            if check_bcs_name:
+                assert mode1.bcs_name != mode2.bcs_name
+            if mode1.bcs_name.startswith("mixed"):
+                if check_bcs_name:
+                    assert mode2.bcs_name.startswith("mixed"), (
+                        mode1.bcs_name,
+                        mode2.bcs_name,
+                    )
+                    # switch order if necessary
+                    if mode1.bcs_name == "mixed2":
+                        mode1, mode2 = mode2, mode1
+            else:
+                if check_bcs_name:
+                    assert not mode2.bcs_name.startswith("mixed"), (
+                        mode1.bcs_name,
+                        mode2.bcs_name,
+                    )
+                    # switch order if necessary
+                    if mode1.bcs_name == "full_dbc":
+                        mode1, mode2 = mode2, mode1
+
+            yield ModePair(mode1.k, k_rel_err, mode1, mode2)
 
 
 def test_evaltraj(system, system_quarter):
@@ -330,7 +411,7 @@ def test_evaltraj(system, system_quarter):
     }
 
     D0_constant = real_const(system_quarter.V, 1.0)
-    D0_range = np.linspace(0.05, 0.12, 4)
+    D0_range = np.linspace(0.05, 0.2, 4)
 
     vals = []
     for D0 in D0_range:
@@ -369,6 +450,7 @@ def test_evaltraj(system, system_quarter):
         cbar.set_label("D0", loc="top")
 
         plot_ellipse(ax, system_quarter.rg_params)
+        list(map(lambda x: ax.axvline(x=x), allK))
 
         ax.grid(True)
 
@@ -377,6 +459,95 @@ def test_evaltraj(system, system_quarter):
     )
 
     plt.show()
+
+
+def norm_mode(mode: np.ndarray) -> int:
+    dof_at_maximum = np.abs(mode).argmax()
+    val_maximum = mode[dof_at_maximum]
+    # fix norm and the phase
+    mode /= val_maximum
+    return dof_at_maximum
+
+
+def build_circulating_mode(
+    k: complex, mode1: np.ndarray, mode2: np.ndarray
+) -> algorithms.NEVPNonLasingMode:
+    _mode = mode1 - 1j * mode2
+    _dof_at_maximum = norm_mode(_mode)
+    return algorithms.NEVPNonLasingMode(
+        array=_mode,
+        k=k,
+        error=0.0,
+        bcs_name="default",
+        bcs=[],  # on the circle grid we don't need bcs
+        dof_at_maximum=_dof_at_maximum,
+    )
+
+
+def find_circulating_mode_above_real_axis(ctrl_modes) -> algorithms.NEVPNonLasingMode:
+    pairs = list(
+        find_pairs(
+            [m for m in ctrl_modes if m.k.imag > eval_threshold],
+            rel_k_distance=1e-5,  # don't know why I need a higher tolerance
+            check_bcs_name=False,
+        )
+    )
+    Print(f"k of pairs: {[p.k for p in pairs]}")
+    Print([p.k_rel_err for p in pairs])
+    Print([(p.mode1.bcs_name, p.mode2.bcs_name) for p in pairs])
+
+    maxkimag_pairs = list(sorted(pairs, key=lambda x: -x.k.imag))
+    assert maxkimag_pairs
+
+    circulating_modes = [
+        build_circulating_mode(
+            maxkimag_pair.k,
+            maxkimag_pair.mode1.array,
+            maxkimag_pair.mode2.array,
+        )
+        for maxkimag_pair in maxkimag_pairs
+    ]
+    assert len(circulating_modes) == 1
+
+    # TODO not sure if mode is really a circulating mode
+    return circulating_modes[0]
+
+
+def refine_two_circulating_modes(rmode, mode2, newton_operators, nlp, bcs):
+    """Refine a mode (that was a single lasing mode at the previous pump step)
+    and a 2nd mode that is above the threshold."""
+    minfos = [
+        newtils.NewtonModeInfo(
+            k=rmode.k.real,
+            s=1.0,
+            re_array=rmode.array.real / rmode.s,
+            im_array=rmode.array.imag / rmode.s,
+            dof_at_maximum=rmode.dof_at_maximum,
+        ),
+        newtils.NewtonModeInfo(
+            k=mode2.k.real,
+            s=1.0,
+            re_array=mode2.array.real,
+            im_array=mode2.array.imag,
+            dof_at_maximum=mode2.dof_at_maximum,
+        ),
+    ]
+
+    active_modes = 2
+    refined_modes = algorithms.refine_modes(
+        minfos,
+        bcs,
+        newton_operators[active_modes].solver,
+        nlp,
+        newton_operators[active_modes].A,
+        newton_operators[active_modes].L,
+        newton_operators[active_modes].delta_x,
+        newton_operators[active_modes].initial_x,
+        fail_early=True,
+    )
+    assert all(rm.converged for rm in refined_modes)
+    assert len(refined_modes) == active_modes
+    return refined_modes
 
 
 def determine_circulating_mode_at_D0(
@@ -396,12 +567,16 @@ def determine_circulating_mode_at_D0(
         # at the outer pml we impose DBC but at the symmetry axes we impose NBC.
         on_outer_boundary,
     )
-    # TODO explain why we don't solve the NEVP using mixed symmetry bcs
-    # bcs_dofs_mixed = fem.locate_dofs_geometrical(
-    #     system_quarter.V,
-    #     # DBC at x-axis, NBC at y-axis
-    #     lambda x: np.isclose(x[1], 0) | on_outer_boundary(x),
-    # )
+    bcs_dofs_mixed1 = fem.locate_dofs_geometrical(
+        system_quarter.V,
+        # DBC at x-axis, NBC at y-axis
+        lambda x: np.isclose(x[1], 0) | on_outer_boundary(x),
+    )
+    bcs_dofs_mixed2 = fem.locate_dofs_geometrical(
+        system_quarter.V,
+        # DBC at y-axis, NBC at x-axis
+        lambda x: np.isclose(x[0], 0) | on_outer_boundary(x),
+    )
 
     bcs = {
         "full_dbc": [
@@ -410,9 +585,12 @@ def determine_circulating_mode_at_D0(
         "full_nbc": [
             fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs_nbc, system_quarter.V),
         ],
-        # "mixed": [
-        #     fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs_mixed, system_quarter.V),
-        # ],
+        "mixed1": [
+            fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs_mixed1, system_quarter.V),
+        ],
+        "mixed2": [
+            fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs_mixed2, system_quarter.V),
+        ],
     }
 
     # TODO figure out why the convergence is not so good at smaller D0
@@ -431,7 +609,7 @@ def determine_circulating_mode_at_D0(
 
     defaultD0 = D0 == 0.1
     if defaultD0:
-        assert len(modes) == 14
+        assert len(modes) == 30
         assert modes[0].bcs_name == "full_dbc"
 
     def scatter_plot(vals, title):
@@ -443,169 +621,77 @@ def determine_circulating_mode_at_D0(
         ax.set_ylabel("k.imag")
 
         plot_ellipse(ax, system.rg_params)
+        list(map(lambda x: ax.axvline(x=x), allK))
 
         ax.grid(True)
 
-    scatter_plot(
-        np.asarray([mode.k for mode in modes]), f"Non-Interacting thresholds at {D0=}"
+    # scatter_plot(
+    #     np.asarray([mode.k for mode in modes]), f"Non-Interacting thresholds at {D0=}"
+    # )
+    # plt.show()
+
+    pairs = list(
+        find_pairs([m for m in modes if m.k.imag > eval_threshold], rel_k_distance=1e-6)
     )
-    plt.show()
+    Print(f"k of pairs: {[p.k for p in pairs]}")
+    Print([p.k_rel_err for p in pairs])
+    Print([(p.mode1.bcs_name, p.mode2.bcs_name) for p in pairs])
 
-    dbc_modes_above_threshold = [
-        mode for mode in modes if mode.bcs_name == "full_dbc" and mode.k.imag > 0
-    ]
-    assert len(dbc_modes_above_threshold) > 0
+    maxkimag_pairs = list(sorted(pairs, key=lambda x: -x.k.imag))
+    assert maxkimag_pairs
 
-    k_fm = 5.380  # approx k first mode
-    # k_fm = 4.25  # approx k second mode
-    dbc_quarter_mode = dbc_modes_above_threshold[
-        np.argmin([abs(m.k.real - k_fm) for m in dbc_modes_above_threshold])
-    ]
+    # we loop over the maxkimag pairs because it can happen that the mode with the
+    # highest k-imag doesn't lase (in this case an exception is raised when this mode
+    # and the other mode that is above threshold is refined)
+    circulating_modes = []
+    for maxkimag_pair in maxkimag_pairs:
+        Print(f"{maxkimag_pair.k=}".center(80, "-"))
 
-    nbc_modes_above_threshold = [
-        mode for mode in modes if mode.bcs_name == "full_nbc" and mode.k.imag > 0
-    ]
-    assert len(nbc_modes_above_threshold) > 0
-    nbc_quarter_mode = nbc_modes_above_threshold[
-        np.argmin([abs(m.k.real - k_fm) for m in nbc_modes_above_threshold])
-    ]
-
-    # transform the modes on the quarter mesh to modes on the full mesh
-    dbc_mode = map_function_to_circle_mesh(
-        dbc_quarter_mode, np.array([[-1, 1], [1, -1]]), system.V, system_quarter.V
-    )
-    nbc_mode = map_function_to_circle_mesh(
-        nbc_quarter_mode, np.array([[1, 1], [1, 1]]), system.V, system_quarter.V
-    )
-
-    dbc_internal_intensity = fem.assemble_scalar(
-        fem.form(abs(dbc_mode) ** 2 * system.dx_circle)
-    )
-    assert dbc_internal_intensity.imag < 1e-15
-    if defaultD0:
-        assert dbc_internal_intensity.real == pytest.approx(0.662, rel=0.1)
-
-    nbc_internal_intensity = fem.assemble_scalar(
-        fem.form(abs(nbc_mode) ** 2 * system.dx_circle)
-    )
-    assert nbc_internal_intensity.imag < 1e-15
-    if defaultD0:
-        assert nbc_internal_intensity.real == pytest.approx(0.662, rel=0.1)
-
-    debug = False
-    if debug:
-        # plot the modes on the circle mesh
-        for title, vals in [
-            ("DBC mode", system.evaluator(dbc_mode.x.array).reshape(system.X.shape)),
-            ("NBC mode", system.evaluator(nbc_mode.x.array).reshape(system.X.shape)),
-        ]:
-            _, ax = plt.subplots()
-            ax.pcolormesh(
-                system.X,
-                system.Y,
-                # abs(vals) ** 2,
-                vals.real,
-                # vmin=0.0,
-            )
-            ax.set_title(title)
-        plt.show()
-
-    # make sure that k of the dbc and nbc modes is the same, s.t. we can build a
-    # circulating mode.
-    _lam_dbc, _lam_nbc = (
-        dbc_quarter_mode.k,
-        nbc_quarter_mode.k,
-    )
-    assert _lam_dbc.imag > 0
-    np.testing.assert_allclose(_lam_nbc, _lam_dbc, rtol=5e-7)
-    _lam = _lam_dbc
-
-    mode_dbc = dbc_mode.vector.getArray().copy()
-    mode_nbc = nbc_mode.vector.getArray().copy()
-
-    #    = "cos"    - 1j "sin"
-    mode = mode_nbc - 1j * mode_dbc
-
-    if debug:
-        vals = system.evaluator(mode).reshape(system.X.shape)
-        _, ax = plt.subplots()
-        # a nice ring pattern should be shown here
-        ax.pcolormesh(
-            system.X,
-            system.Y,
-            abs(vals) ** 2,
-            vmin=0.0,
+        mode_1a = map_function_to_circle_mesh(
+            maxkimag_pair.mode1, system.V, system_quarter.V
+        )
+        mode_1b = map_function_to_circle_mesh(
+            maxkimag_pair.mode2, system.V, system_quarter.V
         )
 
-        vals = system.evaluator_circle(mode)  # .reshape(system.X.shape)
-        _, ax = plt.subplots()
-        # ax.pcolormesh(
-        #     system.X,
-        #     system.Y,
-        #     vals.real,
-        #     #abs(vals) ** 2,
-        #     # vmin=0.0,
-        # )
+        circulating_mode1 = build_circulating_mode(
+            maxkimag_pair.k, mode_1a.vector.getArray(), mode_1b.vector.getArray()
+        )
+        circulating_modes.append(circulating_mode1)
 
-        # The intensity fluctuates a tiny bit
-        ax.plot(system.phi - np.pi, abs(vals) ** 2)
-        ax.set_ylim(0, 1.0)
-        ax.set_title("mode")
-
-        vals_dbc = system.evaluator_circle(mode_dbc)
-        vals_nbc = system.evaluator_circle(mode_nbc)
-
-        _, ax = plt.subplots()
-        ax.plot(system.phi - np.pi, abs(vals_nbc.real - 1j * vals_dbc.real) ** 2)
-        ax.set_ylim(0, 1.0)
-        ax.set_title("nbc-1jdbc")
-
-        _, ax = plt.subplots()
-        ax.plot(system.phi - np.pi, abs(vals_nbc) ** 2, label="intens nbc")
-        ax.plot(system.phi - np.pi, abs(vals_dbc) ** 2, label="intens dbc")
-        ax.legend()
-
-        _, ax = plt.subplots()
-        ax.plot(system.phi - np.pi, vals_nbc.real, label="real nbc")
-        ax.plot(system.phi - np.pi, vals_dbc.real, label="real dbc")
-        ax.legend()
-
-        _, ax = plt.subplots()
-        ax.plot(system.phi - np.pi, np.angle(vals_nbc), label="phase nbc")
-        ax.plot(system.phi - np.pi, np.angle(vals_dbc), label="phase dbc")
-        ax.legend()
-
-        plt.show()
-
-    dof_at_maximum = np.abs(mode).argmax()
-    val_maximum = mode[dof_at_maximum]
-    # fix norm and the phase
-    mode /= val_maximum
-
-    # we don't need any dirichlet BCs because our domain is a rectangle with a PML.
-    bcs = []
-
-    mode = algorithms.NEVPNonLasingMode(
-        array=mode,
-        k=_lam,
-        error=0.0,
-        bcs_name="default",
-        bcs=bcs,
-        dof_at_maximum=dof_at_maximum,
-    )
-
-    return mode
+    return circulating_modes
 
 
 # D0=0.076 is close to first threshold (see the text in the paper)
 @pytest.mark.parametrize(
     "D0_range",
     [
-        np.linspace(0.1, 0.076, 8),  # single laser mode only
-        [0.145],  # two lasing modes
-        # [0.1538], # does not converge
-        [0.142, 0.1435, 0.145, 0.147, 0.15],  # from one to two lasing modes
-        [0.145, 0.147, 0.15, 0.152, 0.153, 0.1532],  # only two lasing modes
+        # [0.1]  # single laser mode k=5.378
+        # [0.14]  # single laser mode k=5.378
+        # [0.170]  # NEW: only one mode lases
+        # [0.170, 0.1725, 0.175, 0.178],  # NEW: works, only one mode lases at k=4.81
+        # np.linspace(0.170, 0.24, 14),  # NEW: works, only one mode lases at k=4.81
+        # np.linspace(0.08, 0.14, 6),  # NEW: works, only one mode lases at k=5.378
+        # [0.145, 0.147, 0.148, 0.149, 0.15, 0.151, 0.152, 0.153],
+        #                        # NEW: works, shows crossing of two modes
+        # [0.13],  # NEW: works, Not the mode with the highest kimag lases!!!!!!
+        # np.linspace(0.13, 0.15, 8),  # NEW: works, transition from 1 mode to two modes
+        np.linspace(0.13, 0.162, 12),  # NEW: works, transition from single- to
+        #                              # multi-modes to single-mode
+        # np.linspace(0.135, 0.162, 15),  # NEW: works, transition from single- to
+        #                                 # multi-modes to single-mode
+        # [0.153, 0.158], # NEW: works, the mode shut-off can be clearly seen
+        # [0.162],  # NEW works, single mode lases at k=4.81
+        # [0.2],  # NEW works, single mode lases at k=4.81
+        # [0.3], # NEW works, single mode lases at k=4.81
+        # [0.5], # NEW works, single mode lases at k=4.81
+        # [0.1538], # NEW works, single mode lases at k=4.81
+        # [0.150],  # NEW works, two modes laser mode k=5.378, k=4.81
+        # np.linspace(0.13, 0.076, 4),  # single laser mode only
+        # np.linspace(0.13, 0.15, 8),  # single laser mode only
+        # [0.145],  # two lasing modes
+        # [0.142, 0.1435, 0.145, 0.147, 0.15],  # from one to two lasing modes
+        # [0.145, 0.147, 0.15, 0.152, 0.153, 0.1532],  # only two lasing modes
     ],
 )
 def test_solve_single_mode_D0range(system, system_quarter, D0_range):
@@ -619,12 +705,15 @@ def test_solve_single_mode_D0range(system, system_quarter, D0_range):
     D0_start = D0_range[0]
 
     # the circulating mode is a FEM function on the full (circle) system
-    circulating_mode = determine_circulating_mode_at_D0(
+    circulating_modes = determine_circulating_mode_at_D0(
         system, system_quarter, D0=D0_start
     )
 
     arbitrary_default_value = 100.200300
     D0_constant_circle = real_const(system.V, arbitrary_default_value)
+
+    fem_mode = fem.Function(system.V)
+    internal_intensity_form = fem.form(abs(fem_mode) ** 2 * system.dx_circle)
 
     nlp = NonLinearProblem(
         system.V,
@@ -638,27 +727,23 @@ def test_solve_single_mode_D0range(system, system_quarter, D0_range):
     )
     newton_operators = newtils.create_multimode_solvers_and_matrices(nlp, max_nmodes=2)
 
-    minfos = [
-        newtils.NewtonModeInfo(
-            k=circulating_mode.k.real,
-            s=1.0,
-            re_array=circulating_mode.array.real,
-            im_array=circulating_mode.array.imag,
-            dof_at_maximum=circulating_mode.dof_at_maximum,
-        )
-    ]
-    active_modes = 1
+    circulating_mode_results = {}
+    for circulating_mode in circulating_modes:
+        Print(f"{circulating_mode.k.real=}".center(80, "-"))
+        # TODO break out of the loop as soon as we have found a converging mode-set
+        minfos = [
+            newtils.NewtonModeInfo(
+                k=circulating_mode.k.real,
+                s=1.0,
+                re_array=circulating_mode.array.real,
+                im_array=circulating_mode.array.imag,
+                dof_at_maximum=circulating_mode.dof_at_maximum,
+            )
+        ]
+        active_modes = 1
 
-    fem_mode = fem.Function(system.V)
-    internal_intensity_form = fem.form(abs(fem_mode) ** 2 * system.dx_circle)
-
-    bcs = circulating_mode.bcs
-    intensity_map = {}
-    intensity_map_mode2 = {}
-
-    for D0 in D0_range:
-        log.info(f"--------> D0={D0}")
-        D0_constant_circle.value = D0
+        bcs = circulating_mode.bcs
+        D0_constant_circle.value = D0_range[0]
         refined_modes = algorithms.refine_modes(
             minfos,
             bcs,
@@ -669,6 +754,146 @@ def test_solve_single_mode_D0range(system, system_quarter, D0_range):
             newton_operators[active_modes].delta_x,
             newton_operators[active_modes].initial_x,
         )
+        assert all(rm.converged for rm in refined_modes)
+        assert len(refined_modes) == active_modes
+        assert all(rmode.k.imag < 1e-9 for rmode in refined_modes)
+        minfos = [
+            newtils.NewtonModeInfo(
+                k=rmode.k.real,
+                s=rmode.s,
+                re_array=rmode.array.real / rmode.s,
+                im_array=rmode.array.imag / rmode.s,
+                dof_at_maximum=rmode.dof_at_maximum,
+            )
+            for rmode in refined_modes
+        ]
+        # check if the eigenvalue of a new mode is above the real axis
+        nlp.update_b_and_k_for_forms(refined_modes)
+
+        # TODO don't call the NEVP solver for every D0, because the NEVP solver for
+        # the full circle system is computationally intensive.
+
+        Q_form = nlp.get_Q_hbt_form(nmodes=len(refined_modes))
+        _u = ufl.TrialFunction(system.V)
+        _v = ufl.TestFunction(system.V)
+
+        ctrl_modes = algorithms.get_nevp_modes(
+            algorithms.NEVPInputs(
+                ka=system.ka,
+                gt=system.gt,
+                rg_params=system.rg_params,
+                L=assemble_form(
+                    -inner(elem_mult(system.invperm, curl(_u)), curl(_v)) * dx, bcs
+                ),
+                M=assemble_form(system.dielec * inner(_u, _v) * dx, bcs, diag=0.0),
+                N=None,
+                Q=assemble_form(Q_form, bcs, diag=0.0),
+                R=None,
+                bcs=bcs,
+            )
+        )
+
+        ctrl_evals = np.asarray([cm.k for cm in ctrl_modes])
+
+        number_of_modes_close_to_real_axis = np.sum(
+            np.abs(ctrl_evals.imag) < real_axis_threshold
+        )
+        Print(
+            "Number of modes close to real axis: "
+            f"{number_of_modes_close_to_real_axis}"
+        )
+        # 2 degenerate modes (should be CW and CCW modes) are close to the real axis
+        assert number_of_modes_close_to_real_axis == 2 * active_modes
+
+        number_of_modes_above_real_axis = np.sum(ctrl_evals.imag > real_axis_threshold)
+        Print(
+            f"###### Number of modes above real axis: {number_of_modes_above_real_axis}"
+        )
+        circulating_mode_results[circulating_mode.k.real] = (
+            number_of_modes_close_to_real_axis,
+            number_of_modes_above_real_axis,
+        )
+
+        if not number_of_modes_above_real_axis:
+            break
+
+        if number_of_modes_above_real_axis == 4:
+            Print(
+                "We don't support more than 2 lasing modes yet -> continue with next "
+                "pair"
+            )
+            continue
+
+        Print(
+            "Check if it is possible to bring a 2nd mode to the real axis and break "
+            "out of the for loop"
+        )
+        assert active_modes == 1
+        assert len(refined_modes) == 1
+
+        # find the 2 ctrl_modes above threshold, and create a circulating mode
+        mode2 = find_circulating_mode_above_real_axis(ctrl_modes)
+        Print("Refine two circulating modes")
+        try:
+            refined_modes = refine_two_circulating_modes(
+                refined_modes[0], mode2, newton_operators, nlp, bcs
+            )
+        except algorithms.RefinementError:
+            continue
+        minfos = [
+            newtils.NewtonModeInfo(
+                k=rmode.k.real,
+                s=rmode.s,
+                re_array=rmode.array.real / rmode.s,
+                im_array=rmode.array.imag / rmode.s,
+                dof_at_maximum=rmode.dof_at_maximum,
+            )
+            for rmode in refined_modes
+        ]
+        active_modes = 2
+        break
+    else:
+        raise RuntimeError(
+            f"Not possible to find set of max. two lasing modes at D0={D0_range[0]}"
+        )
+
+    Print(f"{circulating_mode_results=}")
+
+    intensity_map = {}
+    intensity_map_mode2 = {}
+
+    for D0 in D0_range:
+        log.info(f"--------> D0={D0}")
+        D0_constant_circle.value = D0
+        while True:
+            log.info(f"In while True body D0={D0}")
+            try:
+                refined_modes = algorithms.refine_modes(
+                    minfos,
+                    bcs,
+                    newton_operators[active_modes].solver,
+                    nlp,
+                    newton_operators[active_modes].A,
+                    newton_operators[active_modes].L,
+                    newton_operators[active_modes].delta_x,
+                    newton_operators[active_modes].initial_x,
+                    fail_early=True,
+                )
+                break
+            except algorithms.RefinementError:
+                if len(minfos) > 1:
+                    log.warning("Check for shut-down of mode")
+                    # try to decrease minfos and check if refine_mode converges
+
+                    # TODO use a better metric to determine the mode that shut down.
+                    # minfos = minfos[:1]
+                    minfos = minfos[1:]
+                    log.warning(f"Check if mode at k={minfos[0].k} is a lasing mode")
+                    active_modes = 1
+                else:
+                    raise
+
+        log.info(f"--------> after while True loop at D0={D0}")
         assert all(rm.converged for rm in refined_modes)
         assert len(refined_modes) == active_modes
 
@@ -697,168 +922,84 @@ def test_solve_single_mode_D0range(system, system_quarter, D0_range):
             )
             for rmode in refined_modes
         ]
+        log.info(f"--------> len refined modes: {len(minfos)} D0={D0}")
 
-        if D0_start > 0.12:  # this improves the runtime of the code
-            # check if the eigenvalue of a new mode is above the real axis
-            nlp.update_b_and_k_for_forms(refined_modes)
+        # check if the eigenvalue of a new mode is above the real axis
+        nlp.update_b_and_k_for_forms(refined_modes)
 
-            # TODO don't call the NEVP solver for every D0, because the NEVP solver for
-            # the full circle system is computationally intensive.
+        # TODO don't call the NEVP solver for every D0, because the NEVP solver for
+        # the full circle system is computationally intensive.
 
-            Q_form = nlp.get_Q_hbt_form(nmodes=len(refined_modes))
-            _u = ufl.TrialFunction(system.V)
-            _v = ufl.TestFunction(system.V)
+        Q_form = nlp.get_Q_hbt_form(nmodes=len(refined_modes))
+        _u = ufl.TrialFunction(system.V)
+        _v = ufl.TestFunction(system.V)
 
-            ctrl_modes = algorithms.get_nevp_modes(
-                algorithms.NEVPInputs(
-                    ka=system.ka,
-                    gt=system.gt,
-                    rg_params=system.rg_params,
-                    L=assemble_form(
-                        -inner(elem_mult(system.invperm, curl(_u)), curl(_v)) * dx, bcs
-                    ),
-                    M=assemble_form(system.dielec * inner(_u, _v) * dx, bcs, diag=0.0),
-                    N=None,
-                    Q=assemble_form(Q_form, bcs, diag=0.0),
-                    R=None,
-                    bcs=bcs,
+        ctrl_modes = algorithms.get_nevp_modes(
+            algorithms.NEVPInputs(
+                ka=system.ka,
+                gt=system.gt,
+                rg_params=system.rg_params,
+                L=assemble_form(
+                    -inner(elem_mult(system.invperm, curl(_u)), curl(_v)) * dx, bcs
+                ),
+                M=assemble_form(system.dielec * inner(_u, _v) * dx, bcs, diag=0.0),
+                N=None,
+                Q=assemble_form(Q_form, bcs, diag=0.0),
+                R=None,
+                bcs=bcs,
+            )
+        )
+        ctrl_evals = np.asarray([cm.k for cm in ctrl_modes])
+
+        number_of_modes_close_to_real_axis = np.sum(
+            np.abs(ctrl_evals.imag) < real_axis_threshold
+        )
+        Print(
+            "Number of modes close to real axis: "
+            f"{number_of_modes_close_to_real_axis}"
+        )
+        # 2 degenerate modes (should be CW and CCW modes) are close to the real axis
+        assert number_of_modes_close_to_real_axis == 2 * active_modes
+
+        number_of_modes_above_real_axis = np.sum(ctrl_evals.imag > real_axis_threshold)
+        Print(f"Number of modes above real axis: {number_of_modes_above_real_axis}")
+
+        # FIXME this raises when D0 is close to the 2nd threshold (around 0.165
+        # according to fig 7), but why does it raise before this threshold is
+        # reached?
+        # assert number_of_modes_above_real_axis == 2
+
+        if number_of_modes_above_real_axis:
+            assert active_modes == 1
+            assert len(refined_modes) == 1
+
+            # find the 2 ctrl_modes above threshold, and create a circulating mode
+            mode2 = find_circulating_mode_above_real_axis(ctrl_modes)
+
+            refined_modes = refine_two_circulating_modes(
+                refined_modes[0], mode2, newton_operators, nlp, bcs
+            )
+            minfos = [
+                newtils.NewtonModeInfo(
+                    k=rmode.k.real,
+                    s=rmode.s,
+                    re_array=rmode.array.real / rmode.s,
+                    im_array=rmode.array.imag / rmode.s,
+                    dof_at_maximum=rmode.dof_at_maximum,
                 )
-            )
+                for rmode in refined_modes
+            ]
+            active_modes = 2
 
-            ctrl_evals = np.asarray([cm.k for cm in ctrl_modes])
+            fem_mode.x.array[:] = refined_modes[0].array
+            internal_intensity = fem.assemble_scalar(internal_intensity_form)
+            assert internal_intensity.imag < 1e-15
+            intensity_map[D0] = internal_intensity.real
 
-            # TODO Try to decrease this threshold to at least 1e-9
-            real_axis_threshold = 2.2e-8
-            number_of_modes_close_to_real_axis = np.sum(
-                np.abs(ctrl_evals.imag) < real_axis_threshold
-            )
-            Print(
-                "Number of modes close to real axis: "
-                f"{number_of_modes_close_to_real_axis}"
-            )
-            # 2 degenerate modes (should be CW and CCW modes) are close to the real axis
-            assert number_of_modes_close_to_real_axis == 2 * active_modes
-
-            number_of_modes_above_real_axis = np.sum(
-                ctrl_evals.imag > real_axis_threshold
-            )
-            Print(f"Number of modes above real axis: {number_of_modes_above_real_axis}")
-
-            # FIXME this raises when D0 is close to the 2nd threshold (around 0.165
-            # according to fig 7), but why does it raise before this threshold is
-            # reached?
-            # assert number_of_modes_above_real_axis == 2
-
-            if number_of_modes_above_real_axis:
-                assert active_modes == 1
-                # find the 2 ctrl_modes above threshold and sum them up
-
-                k_fm = 4.813  # approx k second mode
-                midx = np.argmin([abs(m.k.real - k_fm) for m in ctrl_modes])
-
-                if abs(ctrl_modes[midx + 1].k - k_fm) < 0.1:
-                    m_a, m_b = ctrl_modes[midx], ctrl_modes[midx + 1]
-                else:
-                    m_a, m_b = ctrl_modes[midx], ctrl_modes[midx - 1]
-                    assert abs(m_b.k - k_fm) < 0.1
-
-                m_a_vals = m_a.array.copy()
-                m_b_vals = m_b.array.copy()
-
-                _lam = m_a.k
-                assert _lam.imag > 0
-
-                #    = "cos"    - 1j "sin"
-                m_ab = m_b_vals - 1j * m_a_vals
-
-                dof_at_maximum = np.abs(m_ab).argmax()
-                val_maximum = m_ab[dof_at_maximum]
-                # fix norm and the phase
-                m_ab /= val_maximum
-
-                mode2 = algorithms.NEVPNonLasingMode(
-                    array=m_ab,
-                    k=_lam,
-                    error=0.0,
-                    bcs_name="default",
-                    bcs=bcs,
-                    dof_at_maximum=dof_at_maximum,
-                )
-
-                if False:
-                    for title, vals in [
-                        (
-                            "DBC mode",
-                            system.evaluator(m_a_vals).reshape(system.X.shape),
-                        ),
-                        (
-                            "NBC mode",
-                            system.evaluator(m_b_vals).reshape(system.X.shape),
-                        ),
-                    ]:
-                        _, ax = plt.subplots()
-                        ax.pcolormesh(
-                            system.X,
-                            system.Y,
-                            # abs(vals) ** 2,
-                            vals.real,
-                            # vmin=0.0,
-                        )
-                        ax.set_title(title)
-
-                    _, ax = plt.subplots()
-                    vals = system.evaluator(m_ab).reshape(system.X.shape)
-                    ax.pcolormesh(
-                        system.X,
-                        system.Y,
-                        abs(vals) ** 2,
-                        vmin=0.0,
-                    )
-                    ax.set_title("SUM")
-                    plt.show()
-
-                _rmode = refined_modes[0]
-                minfos = [
-                    newtils.NewtonModeInfo(
-                        k=_rmode.k.real,
-                        s=1.0,
-                        re_array=_rmode.array.real / _rmode.s,
-                        im_array=_rmode.array.imag / _rmode.s,
-                        dof_at_maximum=_rmode.dof_at_maximum,
-                    ),
-                    newtils.NewtonModeInfo(
-                        k=mode2.k.real,
-                        s=1.0,
-                        re_array=mode2.array.real,
-                        im_array=mode2.array.imag,
-                        dof_at_maximum=mode2.dof_at_maximum,
-                    ),
-                ]
-
-                active_modes = 2
-                refined_modes = algorithms.refine_modes(
-                    minfos,
-                    bcs,
-                    newton_operators[active_modes].solver,
-                    nlp,
-                    newton_operators[active_modes].A,
-                    newton_operators[active_modes].L,
-                    newton_operators[active_modes].delta_x,
-                    newton_operators[active_modes].initial_x,
-                    fail_early=False,
-                )
-                assert all(rm.converged for rm in refined_modes)
-                assert len(refined_modes) == active_modes
-
-                fem_mode.x.array[:] = refined_modes[0].array
-                internal_intensity = fem.assemble_scalar(internal_intensity_form)
-                assert internal_intensity.imag < 1e-15
-                intensity_map[D0] = internal_intensity.real
-
-                fem_mode.x.array[:] = refined_modes[1].array
-                internal_intensity = fem.assemble_scalar(internal_intensity_form)
-                assert internal_intensity.imag < 1e-15
-                intensity_map_mode2[D0] = internal_intensity.real
+            fem_mode.x.array[:] = refined_modes[1].array
+            internal_intensity = fem.assemble_scalar(internal_intensity_form)
+            assert internal_intensity.imag < 1e-15
+            intensity_map_mode2[D0] = internal_intensity.real
 
     if isinstance(D0_range, np.ndarray):
         pass

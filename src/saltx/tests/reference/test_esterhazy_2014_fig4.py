@@ -424,7 +424,7 @@ def test_intensity_vs_pump_esterhazy(system):
                     nops.initial_x,
                     fail_early=True,
                 )
-            except ValueError:
+            except algorithms.RefinementError:
                 # the modes couldn't be refined
                 log.error("Starting CPA")
                 active_modes = algorithms.constant_pump_algorithm(

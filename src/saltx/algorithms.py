@@ -28,6 +28,10 @@ log = logging.getLogger(__name__)
 Print = PETSc.Sys.Print
 
 
+class RefinementError(Exception):
+    """Raised when `refine_modes` can't successfully refine the given modes."""
+
+
 @dataclasses.dataclass
 class NEVPNonLasingMode:  # The solutions of a nonlinear (in k) EVP
     array: np.ndarray
@@ -272,7 +276,7 @@ def refine_modes(
         )
         if all([refmode.converged for refmode in refmodes]):
             return refmodes
-        raise ValueError("Couldn't successfully refine modes")
+        raise RefinementError("Couldn't successfully refine modes")
 
     relparams = [1.0, 0.8, 0.6, 0.5]
 
@@ -306,7 +310,7 @@ def refine_modes(
             PC.setFactorSolverType("mumps")
             solver = new_solver
 
-    raise ValueError("Couldn't successfully refine mode")
+    raise RefinementError("Couldn't successfully refine mode")
 
 
 def _refine_modes(
