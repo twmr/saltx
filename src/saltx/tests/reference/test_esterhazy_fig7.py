@@ -869,8 +869,15 @@ def test_solve_single_mode_D0range(system, system_quarter, D0_range):
         assert intensity_map_mode2[0.145] == pytest.approx(0.239567162395648, rel=1e-3)
 
     fig, ax = plt.subplots()
-    refdata = np.loadtxt("./data/references/esterhazy_fig7/mode1.csv", delimiter=",")
-    ax.plot(refdata[:, 0], refdata[:, 1], "x")
+    mode1_refdata = np.loadtxt(
+        "./data/references/esterhazy_fig7/mode1.csv", delimiter=","
+    )
+    mode2_refdata = np.loadtxt(
+        "./data/references/esterhazy_fig7/mode2.csv", delimiter=","
+    )
+
+    ax.plot(mode1_refdata[:, 0], mode1_refdata[:, 1], "x")
+    ax.plot(mode2_refdata[:, 0], mode2_refdata[:, 1], "x")
     ax.plot(list(intensity_map.keys()), list(intensity_map.values()), "-o")
     if intensity_map_mode2:
         ax.plot(
