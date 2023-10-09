@@ -521,9 +521,6 @@ def determine_circulating_mode_at_D0(
 ) -> tuple[complex, algorithms.NEVPNonLasingMode]:
     bcs = create_bcs_on_quarter_mesh(system_quarter)
 
-    # TODO figure out why the convergence is not so good at smaller D0
-    D0_constant = real_const(system_quarter.V, D0)
-
     modes, _ = solve_nevp_wrapper(
         system_quarter.ka,
         system_quarter.gt,
@@ -531,7 +528,7 @@ def determine_circulating_mode_at_D0(
         system_quarter.V,
         system_quarter.invperm,
         system_quarter.dielec,
-        D0_constant * system_quarter.pump_profile,
+        real_const(system_quarter.V, D0) * system_quarter.pump_profile,
         bcs,
     )
 
