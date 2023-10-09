@@ -131,6 +131,7 @@ def get_nevp_modes(
     details about this solver see
     https://slepc.upv.es/documentation/reports/str11.pdf
     """
+    t0 = time.monotonic()
     gt = nevp_inputs.gt
     ka = nevp_inputs.ka
     L = nevp_inputs.L
@@ -203,23 +204,19 @@ def get_nevp_modes(
     nep.solve()
 
     its = nep.getIterationNumber()
-    Print("Number of iterations of the method: %i" % its)
     sol_type = nep.getType()
-    Print("Solution method: %s" % sol_type)
     nev, ncv, mpd = nep.getDimensions()
-    Print("")
-    Print("Subspace dimension: %i" % ncv)
+    Print(f"Number of iterations of the {sol_type} method: {its}")
+    Print(f"({nev=}, {ncv=}, {mpd=})")
     tol, maxit = nep.getTolerances()
-    Print("Stopping condition: tol=%.4g" % tol)
-    Print("")
-
+    Print(f"Stopping condition: {tol=:.4g}, {maxit=}")
     nconv = nep.getConverged()
-    Print("Number of converged eigenpairs %d" % nconv)
+    Print(f"Number of converged eigenpairs {nconv}")
+    assert nconv
 
     x = L.createVecs("right")
 
     modes = []
-    assert nconv
     Print()
     Print("        lam              ||T(lam)x||  m[norm_idx]")
     Print("----------------- ------------------ ------------")
@@ -248,6 +245,7 @@ def get_nevp_modes(
             )
         )
     Print()
+    log.info(f"NEVP solver took {time.monotonic()-t0:.1f}s")
     return modes
 
 
