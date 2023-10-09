@@ -10,6 +10,7 @@ See https://link.aps.org/doi/10.1103/PhysRevA.90.023816.
 """
 import dataclasses
 import itertools
+import pickle
 import sys
 import time
 from collections import namedtuple
@@ -62,6 +63,10 @@ class ModeResults:
 class PumpStepResults:
     D0: float
     modes: list[ModeResults]
+
+    # contains len(modes) real-valued eigenvalues and the complex eigenvalues of the
+    # non-active modes
+    nevp_eigenvalues: list[complex]
     duration: float
 
 
@@ -831,9 +836,7 @@ def test_solve_single_mode_D0range(system, system_quarter, D0_range):
         assert number_of_modes_close_to_real_axis == 2 * active_modes
 
         number_of_modes_above_real_axis = np.sum(ctrl_evals.imag > real_axis_threshold)
-        Print(
-            f"###### Number of modes above real axis: {number_of_modes_above_real_axis}"
-        )
+        Print(f"Number of modes above real axis: {number_of_modes_above_real_axis}")
         circulating_mode_results[circulating_mode.k.real] = (
             number_of_modes_close_to_real_axis,
             number_of_modes_above_real_axis,
@@ -888,7 +891,9 @@ def test_solve_single_mode_D0range(system, system_quarter, D0_range):
 
     for D0 in D0_range:
         t0_current_pump_step = time.monotonic()
-        current_pump_step_results = PumpStepResults(D0=D0, modes=[], duration=-1)
+        current_pump_step_results = PumpStepResults(
+            D0=D0, modes=[], nevp_eigenvalues=[], duration=-1
+        )
         sweep_results.pump_step_results.append(current_pump_step_results)
 
         log.info(f"--------> D0={D0}")
@@ -975,6 +980,7 @@ def test_solve_single_mode_D0range(system, system_quarter, D0_range):
             )
         )
         ctrl_evals = np.asarray([cm.k for cm in ctrl_modes])
+        current_pump_step_results.nevp_eigenvalues = ctrl_evals.tolist()
 
         number_of_modes_close_to_real_axis = np.sum(
             np.abs(ctrl_evals.imag) < real_axis_threshold
@@ -1024,6 +1030,9 @@ def test_solve_single_mode_D0range(system, system_quarter, D0_range):
                 for rmode in refined_modes
             ]
 
+            # TODO run nevp-solver again, even though it is not strictly needed here
+            # and use return value for current_pump_step_results.nevp_eigenvalues
+
         current_pump_step_results.modes.extend(current_mode_results)
         current_pump_step_results.duration = time.monotonic() - t0_current_pump_step
 
@@ -1039,6 +1048,9 @@ def test_solve_single_mode_D0range(system, system_quarter, D0_range):
         # assert intensity_map[0.145] == pytest.approx(1.8479903859036326, rel=1e-3)
         # assert intensity_map_mode2[0.145] == pytest.approx(
         # 0.239567162395648, rel=1e-3)
+
+    with open("fig7_results.pickle", "wb") as fh:
+        pickle.dump(sweep_results, fh, protocol=pickle.HIGHEST_PROTOCOL)
 
     fig, ax = plt.subplots()
     mode1_refdata = np.loadtxt(
