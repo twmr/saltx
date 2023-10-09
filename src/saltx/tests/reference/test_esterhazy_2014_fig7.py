@@ -622,8 +622,8 @@ def determine_circulating_mode_at_D0(
         # [0.145, 0.147, 0.15, 0.152, 0.153, 0.1532],  # only two lasing modes
     ],
 )
-def test_solve_single_mode_D0range(system, system_quarter, D0_range):
-    """Determine the lasing mode starting at D0=0.1."""
+def test_solve_multimode_D0range(system, system_quarter, D0_range):
+    """Determine the lasing modes starting at `D0=D0_range[0]`."""
     # For solving the NEVP we use the quarter circle mesh with different boundary
     # conditions. We then refine a circulating mode with Im(k) > 0 s.t. it reaches the
     # real axis. The mode-refining is done using the full-circle mesh, because a
