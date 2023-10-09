@@ -390,9 +390,8 @@ def find_pairs(
             yield ModePair(mode1.k, k_rel_err, mode1, mode2)
 
 
-def test_evaltraj(system, system_quarter):
-    """Determine the complex eigenvalues of the modes without a hole burning
-    term."""
+def create_bcs_on_quarter_mesh(system_quarter) -> dict[str, list]:
+    """Creates the BCs for the different symmetries of a quarter mesh."""
 
     def on_outer_boundary(x):
         return np.isclose(x[0], system_quarter.pml_end) | np.isclose(
@@ -419,21 +418,20 @@ def test_evaltraj(system, system_quarter):
         lambda x: np.isclose(x[0], 0) | on_outer_boundary(x),
     )
 
-    bcs = {
-        "full_dbc": [
-            fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs_dbc, system_quarter.V),
-        ],
-        "full_nbc": [
-            fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs_nbc, system_quarter.V),
-        ],
-        "mixed1": [
-            fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs_mixed1, system_quarter.V),
-        ],
-        "mixed2": [
-            fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs_mixed2, system_quarter.V),
-        ],
+    zero = PETSc.ScalarType(0)
+    return {
+        "full_dbc": [fem.dirichletbc(zero, bcs_dofs_dbc, system_quarter.V)],
+        "full_nbc": [fem.dirichletbc(zero, bcs_dofs_nbc, system_quarter.V)],
+        "mixed1": [fem.dirichletbc(zero, bcs_dofs_mixed1, system_quarter.V)],
+        "mixed2": [fem.dirichletbc(zero, bcs_dofs_mixed2, system_quarter.V)],
     }
 
+
+def test_evaltraj(system, system_quarter):
+    """Determine the complex eigenvalues of the modes without a hole burning
+    term."""
+
+    bcs = create_bcs_on_quarter_mesh(system_quarter)
     D0_constant = real_const(system_quarter.V, 1.0)
     D0_range = np.linspace(0.05, 0.2, 4)
 
@@ -577,45 +575,7 @@ def refine_two_circulating_modes(rmode, mode2, newton_operators, nlp, bcs):
 def determine_circulating_mode_at_D0(
     system, system_quarter, D0: float
 ) -> tuple[complex, algorithms.NEVPNonLasingMode]:
-    def on_outer_boundary(x):
-        return np.isclose(x[0], system_quarter.pml_end) | np.isclose(
-            x[1], system_quarter.pml_end
-        )
-
-    bcs_dofs_dbc = fem.locate_dofs_geometrical(
-        system_quarter.V,
-        lambda x: np.isclose(x[0], 0) | np.isclose(x[1], 0) | on_outer_boundary(x),
-    )
-    bcs_dofs_nbc = fem.locate_dofs_geometrical(
-        system_quarter.V,
-        # at the outer pml we impose DBC but at the symmetry axes we impose NBC.
-        on_outer_boundary,
-    )
-    bcs_dofs_mixed1 = fem.locate_dofs_geometrical(
-        system_quarter.V,
-        # DBC at x-axis, NBC at y-axis
-        lambda x: np.isclose(x[1], 0) | on_outer_boundary(x),
-    )
-    bcs_dofs_mixed2 = fem.locate_dofs_geometrical(
-        system_quarter.V,
-        # DBC at y-axis, NBC at x-axis
-        lambda x: np.isclose(x[0], 0) | on_outer_boundary(x),
-    )
-
-    bcs = {
-        "full_dbc": [
-            fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs_dbc, system_quarter.V),
-        ],
-        "full_nbc": [
-            fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs_nbc, system_quarter.V),
-        ],
-        "mixed1": [
-            fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs_mixed1, system_quarter.V),
-        ],
-        "mixed2": [
-            fem.dirichletbc(PETSc.ScalarType(0), bcs_dofs_mixed2, system_quarter.V),
-        ],
-    }
+    bcs = create_bcs_on_quarter_mesh(system_quarter)
 
     # TODO figure out why the convergence is not so good at smaller D0
     D0_constant = real_const(system_quarter.V, D0)
