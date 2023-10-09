@@ -427,62 +427,6 @@ def create_bcs_on_quarter_mesh(system_quarter) -> dict[str, list]:
     }
 
 
-def test_evaltraj(system, system_quarter):
-    """Determine the complex eigenvalues of the modes without a hole burning
-    term."""
-
-    bcs = create_bcs_on_quarter_mesh(system_quarter)
-    D0_constant = real_const(system_quarter.V, 1.0)
-    D0_range = np.linspace(0.05, 0.2, 4)
-
-    vals = []
-    for D0 in D0_range:
-        Print(f"--> {D0=}")
-        D0_constant.value = D0
-        modes, _ = solve_nevp_wrapper(
-            system_quarter.ka,
-            system_quarter.gt,
-            system_quarter.rg_params,
-            system_quarter.V,
-            system_quarter.invperm,
-            system_quarter.dielec,
-            D0_constant * system_quarter.pump_profile,
-            bcs,
-        )
-        evals = np.asarray([m.k for m in modes])
-        vals.append(np.vstack([D0 * np.ones(evals.shape), evals]).T)
-
-    def scatter_plot(vals, title):
-        fig, ax = plt.subplots()
-        fig.suptitle(title)
-
-        merged = np.vstack(vals)
-        X, Y, C = (
-            merged[:, 1].real,
-            merged[:, 1].imag,
-            merged[:, 0].real,
-        )
-        norm = plt.Normalize(C.min(), C.max())
-
-        sc = ax.scatter(X, Y, c=C, norm=norm)
-        ax.set_xlabel("k.real")
-        ax.set_ylabel("k.imag")
-
-        cbar = fig.colorbar(sc, ax=ax)
-        cbar.set_label("D0", loc="top")
-
-        plot_ellipse(ax, system_quarter.rg_params)
-        list(map(lambda x: ax.axvline(x=x), allK))
-
-        ax.grid(True)
-
-    scatter_plot(
-        vals, f"Non-Interacting thresholds (Range D0={D0_range[0]} .. {D0_range[-1]})"
-    )
-
-    plt.show()
-
-
 def norm_mode(mode: np.ndarray) -> int:
     dof_at_maximum = np.abs(mode).argmax()
     val_maximum = mode[dof_at_maximum]
@@ -1139,4 +1083,60 @@ def test_plot_modeintensities():
     ax.set_xlabel("D0")
     ax.set_xlabel("intensity")
     ax.grid(True)
+    plt.show()
+
+
+def test_evaltraj(system, system_quarter):
+    """Determine the complex eigenvalues of the modes without a hole burning
+    term."""
+
+    bcs = create_bcs_on_quarter_mesh(system_quarter)
+    D0_constant = real_const(system_quarter.V, 1.0)
+    D0_range = np.linspace(0.05, 0.2, 4)
+
+    vals = []
+    for D0 in D0_range:
+        Print(f"--> {D0=}")
+        D0_constant.value = D0
+        modes, _ = solve_nevp_wrapper(
+            system_quarter.ka,
+            system_quarter.gt,
+            system_quarter.rg_params,
+            system_quarter.V,
+            system_quarter.invperm,
+            system_quarter.dielec,
+            D0_constant * system_quarter.pump_profile,
+            bcs,
+        )
+        evals = np.asarray([m.k for m in modes])
+        vals.append(np.vstack([D0 * np.ones(evals.shape), evals]).T)
+
+    def scatter_plot(vals, title):
+        fig, ax = plt.subplots()
+        fig.suptitle(title)
+
+        merged = np.vstack(vals)
+        X, Y, C = (
+            merged[:, 1].real,
+            merged[:, 1].imag,
+            merged[:, 0].real,
+        )
+        norm = plt.Normalize(C.min(), C.max())
+
+        sc = ax.scatter(X, Y, c=C, norm=norm)
+        ax.set_xlabel("k.real")
+        ax.set_ylabel("k.imag")
+
+        cbar = fig.colorbar(sc, ax=ax)
+        cbar.set_label("D0", loc="top")
+
+        plot_ellipse(ax, system_quarter.rg_params)
+        list(map(lambda x: ax.axvline(x=x), allK))
+
+        ax.grid(True)
+
+    scatter_plot(
+        vals, f"Non-Interacting thresholds (Range D0={D0_range[0]} .. {D0_range[-1]})"
+    )
+
     plt.show()
