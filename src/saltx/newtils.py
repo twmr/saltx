@@ -22,6 +22,12 @@ class NewtonModeInfo:
     def cmplx_array(self):
         return self.re_array + 1j * self.im_array
 
+    def __repr__(self) -> str:
+        return (
+            "<NewtonModeInfo("
+            f"k={self.k}, s={self.s}, ..., dof_at_maximum={self.dof_at_maximum}>"
+        )
+
 
 def check_vector_real(vector: PETSc.Vec, nmodes: int, threshold: float = 1e-17):
     # vector could be initial_x, delta_x
