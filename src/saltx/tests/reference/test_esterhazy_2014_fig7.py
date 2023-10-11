@@ -551,17 +551,17 @@ def determine_circulating_mode_at_D0(
 
         ax.grid(True)
 
-    # scatter_plot(
-    #     np.asarray([mode.k for mode in modes]), f"Non-Interacting thresholds at {D0=}"
-    # )
-    # plt.show()
+    if False:
+        scatter_plot(
+            np.asarray([mode.k for mode in modes]),
+            f"Non-Interacting thresholds at {D0=}",
+        )
+        plt.show()
 
     pairs = list(
         find_pairs([m for m in modes if m.k.imag > eval_threshold], rel_k_distance=1e-6)
     )
-    Print(f"k of pairs: {[p.k for p in pairs]}")
-    Print([p.k_rel_err for p in pairs])
-    Print([(p.mode1.bcs_name, p.mode2.bcs_name) for p in pairs])
+    Print(f"k of non-circulating mode pairs: {[p.k for p in pairs]}")
 
     maxkimag_pairs = list(sorted(pairs, key=lambda x: -x.k.imag))
     assert maxkimag_pairs
@@ -635,17 +635,19 @@ def test_solve_multimode_D0range(system, system_quarter, D0_range):
         system, system_quarter, D0=D0_start
     )
 
-    arbitrary_default_value = 100.200300
-    D0_constant_circle = real_const(system.V, arbitrary_default_value)
-
     fem_mode = fem.Function(system.V)
     internal_intensity_form = fem.form(abs(fem_mode) ** 2 * system.dx_circle)
 
-    def calculate_intensity_in_circle(mode_on_circle):
+    def calculate_intensity_in_circle(
+        mode_on_circle: algorithms.NEVPNonLasingModeRealK,
+    ) -> float:
         fem_mode.x.array[:] = mode_on_circle.array
         internal_intensity = fem.assemble_scalar(internal_intensity_form)
         assert internal_intensity.imag < 1e-15
         return internal_intensity.real
+
+    arbitrary_default_value = 100.200300
+    D0_constant_circle = real_const(system.V, arbitrary_default_value)
 
     nlp = NonLinearProblem(
         system.V,
@@ -662,7 +664,7 @@ def test_solve_multimode_D0range(system, system_quarter, D0_range):
     circulating_mode_results = {}
     for circulating_mode in circulating_modes:
         Print(f"{circulating_mode.k.real=}".center(80, "-"))
-        # TODO break out of the loop as soon as we have found a converging mode-set
+        # break out of the loop as soon as we have found a converging mode-set
         minfos = [
             newtils.NewtonModeInfo(
                 k=circulating_mode.k.real,
