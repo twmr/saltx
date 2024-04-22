@@ -42,3 +42,20 @@ select = [
 
 [tool.ruff.isort]
 known-first-party = ["saltx"]
+
+[tool.pixi.project]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[tool.pixi.pypi-dependencies]
+saltx = { path = ".", editable = true }
+
+[tool.pixi.tasks]
+
+[tool.pixi.dependencies]
+fenics-dolfinx = "0.6.0.*"
+pytest = ">=8.1.1,<8.2"
+matplotlib = ">=3.8.4,<3.9"
+pandas = ">=2.2.2,<2.3"
+scipy = ">=1.13.0,<1.14"
+petsc = { version = "*", build = "*complex*" }
