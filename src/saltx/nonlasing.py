@@ -69,9 +69,9 @@ class NonLasingLinearProblem:
         # The initial guess b will also be updated in assemble_F_and_J
         self.b = fem.Function(self.V)
 
-        self.form_Sb: fem.forms.FormMetaClass
-        self.form_dFdk: fem.forms.FormMetaClass
-        self.form_dFdu: fem.forms.FormMetaClass
+        self.form_Sb: fem.forms.Form
+        self.form_dFdk: fem.forms.Form
+        self.form_dFdu: fem.forms.Form
 
         self.ka = ka
         self.gt = gt

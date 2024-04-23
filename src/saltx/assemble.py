@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 
 
 def assemble_form(form, bcs, diag=1.0, mat=None):
-    if isinstance(form, fem.forms.FormMetaClass):
+    if isinstance(form, fem.forms.Form):
         log.error("fem.form form already created")
         fform = form
     else:

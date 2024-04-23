@@ -13,7 +13,7 @@ import typing
 import numpy as np
 import pandas as pd
 from dolfinx import fem, geometry
-from dolfinx.fem import DirichletBCMetaClass
+from dolfinx.fem import DirichletBC
 from petsc4py import PETSc
 from slepc4py import SLEPc
 
@@ -73,7 +73,7 @@ class NEVPInputs:
     # D0)
     Q: PETSc.Mat
     R: PETSc.Mat | None  # can only be used for 1D systems
-    bcs: list[DirichletBCMetaClass]
+    bcs: list[DirichletBC]
 
 
 class Evaluator:
@@ -94,12 +94,12 @@ class Evaluator:
         else:
             raise ValueError("Unsupported ndim")
 
-        bb_tree = geometry.BoundingBoxTree(msh, msh.topology.dim)
+        bb_tree = geometry.bb_tree(msh, msh.topology.dim)
 
         cells = []
         points_on_proc = []
         # Find cells whose bounding-box collide with the the points
-        cell_candidates = geometry.compute_collisions(bb_tree, npoints.T)
+        cell_candidates = geometry.compute_collisions_points(bb_tree, npoints.T)
         # Choose one of the cells that contains the point
         colliding_cells = geometry.compute_colliding_cells(
             msh, cell_candidates, npoints.T
@@ -358,7 +358,7 @@ def _refine_modes(
         with Timer(Print, "Solve KSP"):
             solver.solve(nlL, delta_x)
 
-        initial_x += relaxation_parameter * delta_x
+        initial_x += delta_x * relaxation_parameter
 
         if sanity_checks:
             newtils.check_vector_real(delta_x, nmodes=nmodes, threshold=1e-15)

@@ -28,7 +28,7 @@ addopts = '''
     --durations=100
 '''
 
-[tool.ruff]
+[tool.ruff.lint]
 select = [
     # Pyflakes
     "F",
@@ -44,7 +44,7 @@ select = [
     "RUF",
 ]
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["saltx"]
 
 [tool.pixi.project]
@@ -57,9 +57,11 @@ saltx = { path = ".", editable = true }
 [tool.pixi.tasks]
 
 [tool.pixi.dependencies]
-fenics-dolfinx = "0.6.0.*"
+fenics-dolfinx = "0.7.3.*"
 pytest = ">=8.1.1,<8.2"
 matplotlib = ">=3.8.4,<3.9"
 pandas = ">=2.2.2,<2.3"
 scipy = ">=1.13.0,<1.14"
-petsc = { version = "==3.17.4", build = "complex_*" }
+petsc = { version = "==3.20.6", build = "complex_*" }
+python = "3.12.*"
+ipython = ">=8.22.2,<8.23"

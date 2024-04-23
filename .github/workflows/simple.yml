@@ -17,20 +17,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Install Conda environment from environment.yml
-        uses: mamba-org/provision-with-micromamba@v15
+      - uses: prefix-dev/setup-pixi@v0.6.0
         with:
-          environment-name: cienv
-          environment-file: ./ci/requirements/py310.yml
-      - name: Run Python
-        shell: bash -l {0}
-        run: |
-          python -c "import dolfinx"
-      - name: Install saltx
-        shell: bash -l {0}
-        run: |
-          pip install .
-      - name: Run tests
-        shell: bash -l {0}
-        run: |
-          pytest -s --log-cli-level DEBUG --hide-plots
+            pixi-version: v0.20.0
+            cache: true
+      - run: pixi run pytest -s --log-cli-level DEBUG --hide-plots

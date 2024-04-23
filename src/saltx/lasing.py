@@ -97,7 +97,7 @@ class NonLinearProblem:
             b.x.array[:] = refined_mode.array
             k.value = refined_mode.k
 
-    def get_Q_hbt_form(self, nmodes: int) -> fem.forms.FormMetaClass:
+    def get_Q_hbt_form(self, nmodes: int) -> fem.forms.Form:
         try:
             return self._cur_Q_hbt_forms[nmodes]
         except KeyError:
@@ -105,7 +105,7 @@ class NonLinearProblem:
             self._cur_Q_hbt_forms[Q_hbt_form] = Q_hbt_form
             return Q_hbt_form
 
-    def _create_Q_hbt_form(self, nmodes: int) -> fem.forms.FormMetaClass:
+    def _create_Q_hbt_form(self, nmodes: int) -> fem.forms.Form:
         u = ufl.TrialFunction(self.V)
         v = ufl.TestFunction(self.V)
 
@@ -608,7 +608,8 @@ class NonLinearProblem:
         etbm1s = []
 
         bcscalar = PETSc.ScalarType(0)
-        bcdofs_seq = [bc.dof_indices()[0] for bc in bcs]
+
+        bcdofs_seq = [bc._cpp_object.dof_indices()[0] for bc in bcs]
         # we have to add the same BC for the subspaces self.Ws, because this is required
         # for the block_matrix_assembly
         # TODO rename new_bcs to just bcs

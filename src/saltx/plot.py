@@ -7,7 +7,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import ufl.tensors
-from dolfinx.plot import create_vtk_mesh
+from dolfinx.plot import vtk_mesh
 from matplotlib.patches import Ellipse
 
 
@@ -52,7 +52,7 @@ def plot_ciss_eigenvalues(
 def plot_meshfunctions(msh, pump_profile, dielec, invperm):
     import pyvista
 
-    grid = pyvista.UnstructuredGrid(*create_vtk_mesh(msh, msh.topology.dim))
+    grid = pyvista.UnstructuredGrid(*vtk_mesh(msh, msh.topology.dim))
     # plotter = pyvista.Plotter()
     # num_local_cells = msh.topology.index_map(msh.topology.dim).size_local
     # grid.cell_data["Marker"] = ct.values[ct.indices < num_local_cells]
@@ -114,7 +114,7 @@ def plot_meshfunctions(msh, pump_profile, dielec, invperm):
         plotter.view_xy()
         plotter.show()
 
-    # cells, types, x = create_vtk_mesh(V)
+    # cells, types, x = vtk_mesh(V)
     # grid = pyvista.UnstructuredGrid(cells, types, x)
     # # grid.point_data["u"] = pump.x.array.real
     # # grid.set_active_scalars("u")
@@ -128,7 +128,7 @@ def plot_meshfunctions(msh, pump_profile, dielec, invperm):
 def plot_function(function):
     import pyvista
 
-    topology, cell_types, geometry = create_vtk_mesh(function.function_space)
+    topology, cell_types, geometry = vtk_mesh(function.function_space)
     grid = pyvista.UnstructuredGrid(topology, cell_types, geometry)
 
     grid.point_data["u"] = function.x.array.real
@@ -150,7 +150,7 @@ def plot_function2(msh, dcells, dfuncs):
     num_cells_local = msh.topology.index_map(msh.topology.dim).size_local
     marker = np.zeros(num_cells_local, dtype=np.int32)
 
-    topology, cell_types, x = create_vtk_mesh(
+    topology, cell_types, x = vtk_mesh(
         msh, msh.topology.dim, np.arange(num_cells_local, dtype=np.int32)
     )
 
@@ -173,7 +173,7 @@ def plot_mesh(dolfinx_mesh):
     import pyvista
 
     msh = dolfinx_mesh
-    topology, cell_types, geometry = create_vtk_mesh(msh, msh.topology.dim)
+    topology, cell_types, geometry = vtk_mesh(msh, msh.topology.dim)
     grid = pyvista.UnstructuredGrid(topology, cell_types, geometry)
 
     plotter = pyvista.Plotter()

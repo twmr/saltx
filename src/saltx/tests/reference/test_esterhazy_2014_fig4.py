@@ -115,7 +115,7 @@ def nonlasing_newton(
             solver.solve(nlL, delta_x)
 
         relaxation_param = 1.0
-        initial_x += relaxation_param * delta_x
+        initial_x += delta_x * relaxation_param
 
         cur_k = initial_x.getValue(n)
         Print(f"DELTA k: {delta_x.getValue(n)}")
