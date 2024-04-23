@@ -44,7 +44,7 @@ def plot_ciss_eigenvalues(
 
     if kagt is not None:
         ka, gt = kagt
-        ax.plot(ka, -gt, "ro", label="singularity"),
+        ax.plot(ka, -gt, "ro", label="singularity")
     ax.grid(True)
     plt.show()
 

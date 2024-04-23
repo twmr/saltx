@@ -272,7 +272,7 @@ def test_evaltraj(system):
 
         plot_ellipse(ax, system.rg_params)
         ka, gt = system.ka, system.gt
-        ax.plot(ka, -gt, "ro", label="singularity"),
+        ax.plot(ka, -gt, "ro", label="singularity")
 
         ax.grid(True)
 
@@ -519,7 +519,7 @@ def test_intensity_vs_pump_esterhazy(system):
         cbar.set_label("D0", loc="top")
 
         plot_ellipse(ax, system.rg_params)
-        ax.plot(system.ka, -system.gt, "ro", label="singularity"),
+        ax.plot(system.ka, -system.gt, "ro", label="singularity")
 
         ax.grid(True)
 
