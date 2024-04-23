@@ -154,7 +154,7 @@ all_slepc_evals_n1p2 = [
 ]
 
 
-@pytest.fixture
+@pytest.fixture()
 def system():
     ka = 10.0
     gt = 4.0

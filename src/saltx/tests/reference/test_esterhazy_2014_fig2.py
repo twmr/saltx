@@ -63,7 +63,7 @@ def determine_meshtags_for_1d(msh):
     return meshtags(msh, msh.topology.dim - 1, indices, values[pos])
 
 
-@pytest.fixture
+@pytest.fixture()
 def system(bc_type):
     dielec = 1.2**2
     pump_profile = 1.0
@@ -287,7 +287,7 @@ def test_eval_traj(bc_type, system, first_threshold):
 
 
 @pytest.mark.parametrize(
-    "D0, bc_type",
+    ("D0", "bc_type"),
     [
         (0.37, BCType.DBC),
         (0.38, BCType.DBC),
@@ -497,7 +497,7 @@ def test_solve(D0, bc_type, system):
 
 
 @pytest.mark.parametrize(
-    "D0, bc_type",
+    ("D0", "bc_type"),
     [
         (0.56, BCType.DBC),
     ],
@@ -564,7 +564,7 @@ def test_multimode_solve(D0, bc_type, system):
 
 
 @pytest.mark.parametrize(
-    "bc_type, D0range",
+    ("bc_type", "D0range"),
     [
         (BCType.DBC, np.linspace(0.2668, 0.37, 5)),
         (BCType.DBC, np.linspace(0.3, 0.7, 15)),

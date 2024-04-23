@@ -65,8 +65,8 @@ def colorize(text, color):
 
 
 class ColoredLevelFormatter(logging.Formatter):
-    """A logging formatter which colorizes the %(levelname)..s part of the
-    log format passed to __init__."""
+    """A logging formatter which colorizes the %(levelname)..s part of the log
+    format passed to __init__."""
 
     LOGLEVEL_COLOROPTS: Mapping[int, str] = {
         logging.CRITICAL: "31",  # critical/fatal

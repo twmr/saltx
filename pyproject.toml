@@ -38,6 +38,10 @@ select = [
     # isort
     "I001",
     "RET",
+    # flake8 pytest
+    "PT",
+    "PERF",
+    "RUF",
 ]
 
 [tool.ruff.isort]

@@ -70,12 +70,12 @@ def plot_meshfunctions(msh, pump_profile, dielec, invperm):
     # plotter.view_xy()
     # plotter.show()
 
-    grid.cell_data[
-        "DielecRe"
-    ] = dielec.x.array.real  # [ct.indices < num_local_cells].real
-    grid.cell_data[
-        "DielecIm"
-    ] = dielec.x.array.imag  # [ct.indices < num_local_cells].imag
+    grid.cell_data["DielecRe"] = (
+        dielec.x.array.real
+    )  # [ct.indices < num_local_cells].real
+    grid.cell_data["DielecIm"] = (
+        dielec.x.array.imag
+    )  # [ct.indices < num_local_cells].imag
 
     plotter = pyvista.Plotter()
     grid.set_active_scalars("DielecRe")
@@ -97,18 +97,18 @@ def plot_meshfunctions(msh, pump_profile, dielec, invperm):
 
     for i, component in enumerate(invperm_components):
         plotter = pyvista.Plotter()
-        grid.cell_data[
-            f"InvpermRe{i}"
-        ] = component.x.array.real  # [ct.indices < num_local_cells].real
+        grid.cell_data[f"InvpermRe{i}"] = (
+            component.x.array.real
+        )  # [ct.indices < num_local_cells].real
         grid.set_active_scalars(f"InvpermRe{i}")
         plotter.add_mesh(grid, show_edges=True)
         plotter.view_xy()
         plotter.show()
 
         plotter = pyvista.Plotter()
-        grid.cell_data[
-            f"InvpermIm{i}"
-        ] = component.x.array.imag  # [ct.indices < num_local_cells].imag
+        grid.cell_data[f"InvpermIm{i}"] = (
+            component.x.array.imag
+        )  # [ct.indices < num_local_cells].imag
         grid.set_active_scalars(f"InvpermIm{i}")
         plotter.add_mesh(grid, show_edges=True)
         plotter.view_xy()
