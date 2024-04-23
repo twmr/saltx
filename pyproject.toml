@@ -62,4 +62,4 @@ pytest = ">=8.1.1,<8.2"
 matplotlib = ">=3.8.4,<3.9"
 pandas = ">=2.2.2,<2.3"
 scipy = ">=1.13.0,<1.14"
-petsc = { version = "*", build = "*complex*" }
+petsc = { version = "==3.17.4", build = "complex_*" }

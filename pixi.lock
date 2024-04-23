@@ -12,6 +12,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/binutils_impl_linux-64-2.40-ha885e6a_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/binutils_linux-64-2.40-hdade7a5_3.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/blosc-1.21.5-hc2324a3_1.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/boost-cpp-1.78.0-h2c5509c_4.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/brotli-1.1.0-hd590300_1.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/brotli-bin-1.1.0-hd590300_1.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/bzip2-1.0.8-hd590300_5.conda
@@ -27,14 +28,13 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/exceptiongroup-1.2.0-pyhd8ed1ab_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/expat-2.6.2-h59595ed_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/fenics-basix-0.6.0-py310heada3b3_5.conda
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/fenics-basix-pybind11-abi-0.4.12-heada3b3_5.conda
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/fenics-dolfinx-0.6.0-py310h1ed82a6_9.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/fenics-dolfinx-0.6.0-py310h75a9d1a_3.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/fenics-ffcx-0.6.0-pyh56297ac_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/fenics-libbasix-0.6.0-hfdc072b_5.conda
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/fenics-libdolfinx-0.6.0-hc8f9ddf_9.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/fenics-libdolfinx-0.6.0-h958f910_3.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/fenics-ufcx-0.6.0-h56297ac_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/fenics-ufl-2023.1.1-pyhd8ed1ab_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/fftw-3.3.10-mpi_mpich_h5537406_8.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/fftw-3.3.10-mpi_openmpi_h4a81ba8_8.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/font-ttf-dejavu-sans-mono-2.37-hab24e00_0.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/noarch/font-ttf-inconsolata-3.000-h77eed37_0.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/noarch/font-ttf-source-code-pro-2.038-h77eed37_0.tar.bz2
@@ -57,12 +57,10 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/gxx_impl_linux-64-12.3.0-he2b93b0_5.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/gxx_linux-64-12.3.0-h4a1b8e8_3.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/harfbuzz-8.3.0-h3d44ed6_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/hdf5-1.14.3-mpi_mpich_ha2c2bf8_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/hypre-2.28.0-mpi_mpich_h716cb5e_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/hdf5-1.12.2-mpi_openmpi_h41b9b70_1.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/hypre-2.25.0-mpi_openmpi_ha709252_0.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/linux-64/icu-73.2-h59595ed_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/iniconfig-2.0.0-pyhd8ed1ab_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/kahip-3.15-h96c4266_2.conda
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/kahip-python-3.15-py310h60fa4bd_2.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/kernel-headers_linux-64-2.6.32-he073ed8_17.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/keyutils-1.6.1-h166bdaf_0.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/linux-64/kiwisolver-1.4.5-py310hd41b1e2_1.conda
@@ -71,14 +69,11 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/lcms2-2.16-hb7c19ff_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/ld_impl_linux-64-2.40-h55db66e_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/lerc-4.0.0-h27087fc_0.tar.bz2
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/libadios2-2.9.1-mpi_mpich_h25b007a_4.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/libadios2-2.8.3-mpi_openmpi_h64021f3_5.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libaec-1.1.3-h59595ed_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libasprintf-0.22.5-h661eb56_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libasprintf-devel-0.22.5-h661eb56_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libblas-3.9.0-22_linux64_openblas.conda
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/libboost-1.82.0-h6fcfa73_6.conda
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/libboost-devel-1.82.0-h00ab1b0_6.conda
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/libboost-headers-1.82.0-ha770c72_6.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libbrotlicommon-1.1.0-hd590300_1.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libbrotlidec-1.1.0-hd590300_1.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libbrotlienc-1.1.0-hd590300_1.conda
@@ -141,11 +136,10 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/metis-5.1.0-h59595ed_1007.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/mpfr-4.2.1-h9458935_1.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/mpg123-1.32.6-h59595ed_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/mpi-1.0-mpich.tar.bz2
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/mpi4py-3.1.6-py310h30280a6_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/mpich-4.2.1-h846660c_100.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/mpi-1.0-openmpi.tar.bz2
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/mpi4py-3.1.6-py310h2a790f2_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/mumps-include-5.2.1-ha770c72_11.tar.bz2
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/mumps-mpi-5.2.1-h7ee95aa_11.tar.bz2
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/mumps-mpi-5.2.1-hfb3545b_11.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/noarch/munkres-1.1.4-pyh9f0ad1d_0.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/linux-64/mysql-common-8.3.0-hf1915f5_4.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/mysql-libs-8.3.0-hca2cd23_4.conda
@@ -154,20 +148,21 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/nss-3.98-h1d7d5a4_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/numpy-1.26.4-py310hb13e2d6_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/openjpeg-2.5.2-h488ebb8_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/openmpi-4.1.6-hc5af2df_101.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/openssl-3.2.1-hd590300_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/packaging-24.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pandas-2.2.2-py310hcc13569_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/parmetis-4.0.3-h2a9763c_1005.tar.bz2
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/parmetis-4.0.3-he9a3056_1005.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pcre2-10.43-hcad00b1_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/petsc-3.19.6-complex_hd00473b_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/petsc4py-3.19.6-complex_h2b98e23_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/petsc-3.17.4-complex_hff1c695_1.tar.bz2
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/petsc4py-3.17.4-complex_hfddba75_1.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pillow-10.3.0-py310hf73ecf8_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pixman-0.43.2-h59595ed_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pkg-config-0.29.2-h36c2ea0_1008.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/noarch/pluggy-1.5.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ply-3.11-pyhd8ed1ab_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pthread-stubs-0.4-h36c2ea0_1001.tar.bz2
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/ptscotch-6.0.9-hb499603_2.tar.bz2
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/ptscotch-6.0.9-h0a9c416_2.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pugixml-1.13-h59595ed_1.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/pulseaudio-client-17.0-hb77b528_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/pybind11-abi-4-hd8ed1ab_3.tar.bz2
@@ -183,18 +178,18 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytz-2024.1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/qt-main-5.15.8-hc9dc06e_21.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/readline-8.2-h8228510_1.conda
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/scalapack-2.2.0-hd931219_1.tar.bz2
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/scalapack-2.2.0-h67de57e_1.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/linux-64/scipy-1.13.0-py310hb13e2d6_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/scotch-6.0.9-hb2e6521_2.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/noarch/setuptools-69.5.1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/sip-6.7.12-py310hc6cd4ac_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/six-1.16.0-pyh6c4a22f_0.tar.bz2
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/slepc-3.19.2-complex_hbef8606_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/slepc4py-3.19.2-complex_hbe3c240_1.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/slepc-3.17.2-complex_h8a1df82_0.tar.bz2
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/slepc4py-3.17.2-complex_hd010dac_1.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/linux-64/snappy-1.2.0-hdb0a2a9_1.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/suitesparse-5.10.1-h5a4f163_3.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/superlu-5.2.2-h00795ac_0.tar.bz2
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/superlu_dist-7.2.0-h25dcc4a_0.tar.bz2
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/superlu_dist-7.2.0-h34f6f4d_0.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/noarch/sysroot_linux-64-2.12-he073ed8_17.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/tbb-2021.12.0-h00ab1b0_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/tk-8.6.13-noxft_h4845f30_101.conda
@@ -338,6 +333,28 @@ packages:
   license_family: BSD
   size: 48693
   timestamp: 1712681892833
+- kind: conda
+  name: boost-cpp
+  version: 1.78.0
+  build: h2c5509c_4
+  build_number: 4
+  subdir: linux-64
+  url: https://conda.anaconda.org/conda-forge/linux-64/boost-cpp-1.78.0-h2c5509c_4.conda
+  sha256: a4d17d0b45eee5388fb473fdfb05d6fec283c062f17ee01729214433eedddf9d
+  md5: 417a9d724dc4b651f4a711d3aa3694e3
+  depends:
+  - bzip2 >=1.0.8,<2.0a0
+  - icu >=73.2,<74.0a0
+  - libgcc-ng >=12
+  - libstdcxx-ng >=12
+  - libzlib >=1.2.13,<1.3.0a0
+  - xz >=5.2.6,<6.0a0
+  - zstd >=1.5.2,<1.6.0a0
+  constrains:
+  - libboost <0
+  license: BSL-1.0
+  size: 15892241
+  timestamp: 1692975411646
 - kind: conda
   name: brotli
   version: 1.1.0
@@ -605,61 +622,40 @@ packages:
   size: 206410
   timestamp: 1695893689934
 - kind: conda
-  name: fenics-basix-pybind11-abi
-  version: 0.4.12
-  build: heada3b3_5
-  build_number: 5
-  subdir: linux-64
-  url: https://conda.anaconda.org/conda-forge/linux-64/fenics-basix-pybind11-abi-0.4.12-heada3b3_5.conda
-  sha256: c713144b13d81825ef50a79422764fc282568ec00841affff6aad328b25661b7
-  md5: 07c81f355e2248916d6244e3b65df73b
-  depends:
-  - fenics-basix 0.6.0 py310heada3b3_5
-  constrains:
-  - pybind11-abi 4
-  - gxx 12.*
-  license: MIT
-  license_family: MIT
-  size: 7152
-  timestamp: 1695893697188
-- kind: conda
   name: fenics-dolfinx
   version: 0.6.0
-  build: py310h1ed82a6_9
-  build_number: 9
+  build: py310h75a9d1a_3
+  build_number: 3
   subdir: linux-64
-  url: https://conda.anaconda.org/conda-forge/linux-64/fenics-dolfinx-0.6.0-py310h1ed82a6_9.conda
-  sha256: 093018f4f588b014046eebe35cafb3ffaa7b1d82ae422b2120d079355a876212
-  md5: 59dc6f0ab782d7e16fe5aaf2357a00d4
+  url: https://conda.anaconda.org/conda-forge/linux-64/fenics-dolfinx-0.6.0-py310h75a9d1a_3.conda
+  sha256: 33fa168e48c82347a3818d41844bf9a4582b419b26502164cd77c534c8e91f81
+  md5: 80b7a6dd8d06fde20c7407d28f58037b
   depends:
   - cffi
   - fenics-basix 0.6.*
-  - fenics-basix-pybind11-abi 0.4.12
   - fenics-ffcx 0.6.*
-  - fenics-libdolfinx 0.6.0 hc8f9ddf_9
+  - fenics-libdolfinx 0.6.0 h958f910_3
   - fenics-ufl 2023.1.*
-  - gxx_linux-64 12.*
-  - hdf5 >=1.14.2,<1.14.4.0a0 mpi_mpich_*
-  - kahip-python
+  - gxx_linux-64
+  - hdf5 >=1.12.2,<1.12.3.0a0 mpi_openmpi_*
   - libgcc-ng >=12
   - libstdcxx-ng >=12
   - mpi4py
-  - mpich >=4.1.2,<5.0a0
   - numpy
-  - petsc >=3.19.6,<3.20.0a0 complex_*
+  - openmpi >=4.1.5,<5.0a0
+  - petsc >=3.17.4,<3.18.0a0 complex_*
   - petsc4py
   - pkg-config
-  - pybind11-abi 4
   - python >=3.10,<3.11.0a0
   - python_abi 3.10.* *_cp310
-  - slepc >=3.19.2,<3.20.0a0 complex_*
+  - slepc >=3.17.2,<3.18.0a0 complex_*
   - slepc4py
   license: LGPL-3.0-or-later
   license_family: LGPL
   purls:
-  - pkg:pypi/fenics-dolfinx
-  size: 979201
-  timestamp: 1696299842746
+  - pkg:pypi/fenics-dolfinx@0.6.0
+  size: 955341
+  timestamp: 1686672891507
 - kind: conda
   name: fenics-ffcx
   version: 0.6.0
@@ -704,33 +700,32 @@ packages:
 - kind: conda
   name: fenics-libdolfinx
   version: 0.6.0
-  build: hc8f9ddf_9
-  build_number: 9
+  build: h958f910_3
+  build_number: 3
   subdir: linux-64
-  url: https://conda.anaconda.org/conda-forge/linux-64/fenics-libdolfinx-0.6.0-hc8f9ddf_9.conda
-  sha256: 9950ad9b89caf1f294691364c61787788f0a833e99e9eae553eeebea9bc74307
-  md5: 869d84f074e708789883c64a7177f471
+  url: https://conda.anaconda.org/conda-forge/linux-64/fenics-libdolfinx-0.6.0-h958f910_3.conda
+  sha256: 47412d22cd8193bcbb9cf386a71cab0496e87338846cb11ab6aa01f2b6959271
+  md5: 76bc5facefc0101267bcd00e7f101378
   depends:
+  - boost-cpp >=1.78.0,<1.78.1.0a0
   - fenics-libbasix >=0.6.0,<0.6.1.0a0
   - fenics-ufcx >=0.6.0,<0.6.1.0a0
-  - hdf5 >=1.14.2,<1.14.4.0a0 mpi_mpich_*
-  - kahip >=3.15,<3.16.0a0
-  - libadios2 >=2.9.1,<2.9.2.0a0 mpi_mpich_*
-  - libboost >=1.82.0,<1.83.0a0
-  - libboost-devel
+  - hdf5 >=1.12.2,<1.12.3.0a0 mpi_openmpi_*
+  - libadios2 >=2.8.3,<2.8.4.0a0 mpi_openmpi_*
   - libgcc-ng >=12
   - libstdcxx-ng >=12
-  - mpich >=4.1.2,<5.0a0
+  - openmpi >=4.1.5,<5.0a0
   - parmetis >=4.0.3,<4.1.0a0
   - petsc * complex_*
-  - petsc >=3.19.6,<3.20.0a0 complex_*
+  - petsc >=3.17.4,<3.18.0a0 complex_*
   - ptscotch >=6.0.9,<6.0.10.0a0
   - pugixml >=1.13,<1.14.0a0
-  - slepc >=3.19.2,<3.20.0a0 complex_*
+  - python_abi 3.10.* *_cp310
+  - slepc >=3.17.2,<3.18.0a0 complex_*
   license: LGPL-3.0-or-later
   license_family: LGPL
-  size: 939812
-  timestamp: 1696299622992
+  size: 11421092
+  timestamp: 1686672731566
 - kind: conda
   name: fenics-ufcx
   version: 0.6.0
@@ -766,22 +761,22 @@ packages:
 - kind: conda
   name: fftw
   version: 3.3.10
-  build: mpi_mpich_h5537406_8
+  build: mpi_openmpi_h4a81ba8_8
   build_number: 8
   subdir: linux-64
-  url: https://conda.anaconda.org/conda-forge/linux-64/fftw-3.3.10-mpi_mpich_h5537406_8.conda
-  sha256: 5da13e009b98bf6e2a176b4b3927c11b3017562713646133706b4e6a26353772
-  md5: e1d6091118e52266e9b8e20e0dc6cc23
+  url: https://conda.anaconda.org/conda-forge/linux-64/fftw-3.3.10-mpi_openmpi_h4a81ba8_8.conda
+  sha256: 1b23330f61b9bfec33bc4513842586f898e70dee46f60ccd1e3d5b0874e96f6f
+  md5: 278a83d849ad75d6844621b225939b11
   depends:
   - libgcc-ng >=12
   - libgfortran-ng
   - libgfortran5 >=11.4.0
   - libstdcxx-ng >=12
-  - mpich >=4.1.1,<5.0a0
+  - openmpi >=4.1.5,<5.0a0
   license: GPL-2.0-or-later
   license_family: GPL
-  size: 2062635
-  timestamp: 1686584832359
+  size: 2122087
+  timestamp: 1686585051540
 - kind: conda
   name: font-ttf-dejavu-sans-mono
   version: '2.37'
@@ -1170,44 +1165,45 @@ packages:
   timestamp: 1699925311766
 - kind: conda
   name: hdf5
-  version: 1.14.3
-  build: mpi_mpich_ha2c2bf8_0
+  version: 1.12.2
+  build: mpi_openmpi_h41b9b70_1
+  build_number: 1
   subdir: linux-64
-  url: https://conda.anaconda.org/conda-forge/linux-64/hdf5-1.14.3-mpi_mpich_ha2c2bf8_0.conda
-  sha256: 9b859e76679b852f565d1a48c85cba3861a414bd96b28abd4d8e335926180657
-  md5: 12662900b822f215d6f3d86a188824c9
+  url: https://conda.anaconda.org/conda-forge/linux-64/hdf5-1.12.2-mpi_openmpi_h41b9b70_1.conda
+  sha256: dfef29de18d349eb57d614bb1326535a6d4ede4a21dc23cffc5d5f833a0f0604
+  md5: e84ac513c0e78259512a1da9a3093e5d
   depends:
-  - libaec >=1.1.2,<2.0a0
-  - libcurl >=8.4.0,<9.0a0
+  - libaec >=1.0.6,<2.0a0
+  - libcurl >=7.87.0,<9.0a0
   - libgcc-ng >=12
   - libgfortran-ng
-  - libgfortran5 >=12.3.0
+  - libgfortran5 >=10.4.0
   - libstdcxx-ng >=12
   - libzlib >=1.2.13,<1.3.0a0
-  - mpich >=4.1.2,<5.0a0
-  - openssl >=3.2.0,<4.0a0
+  - openmpi >=4.1.4,<4.2.0a0
+  - openssl >=3.0.7,<4.0a0
   license: LicenseRef-HDF5
   license_family: BSD
-  size: 4071039
-  timestamp: 1701792106389
+  size: 3448619
+  timestamp: 1671625369664
 - kind: conda
   name: hypre
-  version: 2.28.0
-  build: mpi_mpich_h716cb5e_0
+  version: 2.25.0
+  build: mpi_openmpi_ha709252_0
   subdir: linux-64
-  url: https://conda.anaconda.org/conda-forge/linux-64/hypre-2.28.0-mpi_mpich_h716cb5e_0.conda
-  sha256: 6367bb5deef7dc55c4dded4f0fcf9345f04ad968c06573bbf9ecea98498f03ec
-  md5: b41fa6129b3dad329dff734b935130ca
+  url: https://conda.anaconda.org/conda-forge/linux-64/hypre-2.25.0-mpi_openmpi_ha709252_0.tar.bz2
+  sha256: d7e32ef218f968a91a30c2a7ea768449663d2c68df3c7a577bebdd5bd8762c6c
+  md5: 02997add8ee63cd3bc2804078303f94d
   depends:
   - libblas >=3.9.0,<4.0a0
   - libgcc-ng >=12
   - liblapack >=3.9.0,<4.0a0
   - libstdcxx-ng >=12
-  - mpich >=4.0.3,<5.0a0
+  - openmpi >=4.1.4,<5.0a0
   license: Apache-2.0
   license_family: Apache
-  size: 1849730
-  timestamp: 1679072915743
+  size: 1934933
+  timestamp: 1655366937637
 - kind: conda
   name: icu
   version: '73.2'
@@ -1240,45 +1236,6 @@ packages:
   - pkg:pypi/iniconfig
   size: 11101
   timestamp: 1673103208955
-- kind: conda
-  name: kahip
-  version: '3.15'
-  build: h96c4266_2
-  build_number: 2
-  subdir: linux-64
-  url: https://conda.anaconda.org/conda-forge/linux-64/kahip-3.15-h96c4266_2.conda
-  sha256: cbc90f3d9c2bc2acca85bb592dba264a2b3d40ad51004e95f409ecc0f1d35fd8
-  md5: 430181ff9e9103eb5a33b8dd61a95605
-  depends:
-  - _openmp_mutex >=4.5
-  - libgcc-ng >=12
-  - libstdcxx-ng >=12
-  - metis >=5.1.0,<5.1.1.0a0
-  - mpich >=4.1.1,<5.0a0
-  license: MIT
-  license_family: MIT
-  size: 3067547
-  timestamp: 1686684651156
-- kind: conda
-  name: kahip-python
-  version: '3.15'
-  build: py310h60fa4bd_2
-  build_number: 2
-  subdir: linux-64
-  url: https://conda.anaconda.org/conda-forge/linux-64/kahip-python-3.15-py310h60fa4bd_2.conda
-  sha256: 2522d50906854fff4b249b44f98085f877f10ca163dc68ce919290c673394344
-  md5: a2d8c4608a437d8f30e6fb411dc3fa75
-  depends:
-  - kahip 3.15 h96c4266_2
-  - libgcc-ng >=12
-  - libstdcxx-ng >=12
-  - mpich >=4.1.1,<5.0a0
-  - python >=3.10,<3.11.0a0
-  - python_abi 3.10.* *_cp310
-  license: MIT
-  license_family: MIT
-  size: 69536
-  timestamp: 1686684683963
 - kind: conda
   name: kernel-headers_linux-64
   version: 2.6.32
@@ -1408,31 +1365,31 @@ packages:
   timestamp: 1657977462600
 - kind: conda
   name: libadios2
-  version: 2.9.1
-  build: mpi_mpich_h25b007a_4
-  build_number: 4
+  version: 2.8.3
+  build: mpi_openmpi_h64021f3_5
+  build_number: 5
   subdir: linux-64
-  url: https://conda.anaconda.org/conda-forge/linux-64/libadios2-2.9.1-mpi_mpich_h25b007a_4.conda
-  sha256: 7d3a4e280bee44edd72abdc87f6a95973a94314d126087e5978a33a127d4c126
-  md5: e1980157906cf46a121a211da63b9c15
+  url: https://conda.anaconda.org/conda-forge/linux-64/libadios2-2.8.3-mpi_openmpi_h64021f3_5.conda
+  sha256: a845c8cbb31a23ab73a905b0ebdfea4aef9a31d32ddc53251d2c589190bbc87d
+  md5: 21c00732142895f465d5ffcff5a7bb46
   depends:
-  - blosc >=1.21.5,<2.0a0
+  - blosc >=1.21.3,<2.0a0
   - bzip2 >=1.0.8,<2.0a0
-  - hdf5 >=1.14.2,<1.14.4.0a0 mpi_mpich_*
+  - hdf5 >=1.12.2,<1.12.3.0a0 mpi_openmpi_*
   - libffi >=3.4,<4.0a0
   - libgcc-ng >=12
   - libgfortran-ng
-  - libgfortran5 >=12.3.0
+  - libgfortran5 >=11.3.0
   - libpng >=1.6.39,<1.7.0a0
   - libstdcxx-ng >=12
   - libzlib >=1.2.13,<1.3.0a0
-  - mpich >=4.1.2,<5.0a0
-  - zeromq >=4.3.5,<4.4.0a0
+  - openmpi >=4.1.4,<5.0a0
+  - zeromq >=4.3.4,<4.4.0a0
   - zfp >=0.5.5,<1.0a0
   license: Apache-2.0
   license_family: APACHE
-  size: 4231120
-  timestamp: 1698087726600
+  size: 4248361
+  timestamp: 1674512540893
 - kind: conda
   name: libaec
   version: 1.1.3
@@ -1499,59 +1456,6 @@ packages:
   license_family: BSD
   size: 14537
   timestamp: 1712542250081
-- kind: conda
-  name: libboost
-  version: 1.82.0
-  build: h6fcfa73_6
-  build_number: 6
-  subdir: linux-64
-  url: https://conda.anaconda.org/conda-forge/linux-64/libboost-1.82.0-h6fcfa73_6.conda
-  sha256: c820f1ca7a2844fc5589bb101cc33188e06205ccb022051e13a6398def22e8bf
-  md5: 05c40141d4184953616797d5c3d7947f
-  depends:
-  - bzip2 >=1.0.8,<2.0a0
-  - icu >=73.2,<74.0a0
-  - libgcc-ng >=12
-  - libstdcxx-ng >=12
-  - libzlib >=1.2.13,<1.3.0a0
-  - xz >=5.2.6,<6.0a0
-  - zstd >=1.5.5,<1.6.0a0
-  constrains:
-  - boost-cpp =1.82.0
-  license: BSL-1.0
-  size: 2616318
-  timestamp: 1696732023030
-- kind: conda
-  name: libboost-devel
-  version: 1.82.0
-  build: h00ab1b0_6
-  build_number: 6
-  subdir: linux-64
-  url: https://conda.anaconda.org/conda-forge/linux-64/libboost-devel-1.82.0-h00ab1b0_6.conda
-  sha256: 3505d971488558513f1c0a673cb5d9a5f24c19753a06d68d29a355092804b9a2
-  md5: 66fcac2ce711bea87d3aefd64cd03e9e
-  depends:
-  - libboost 1.82.0 h6fcfa73_6
-  - libboost-headers 1.82.0 ha770c72_6
-  constrains:
-  - boost-cpp =1.82.0
-  license: BSL-1.0
-  size: 35668
-  timestamp: 1696732141030
-- kind: conda
-  name: libboost-headers
-  version: 1.82.0
-  build: ha770c72_6
-  build_number: 6
-  subdir: linux-64
-  url: https://conda.anaconda.org/conda-forge/linux-64/libboost-headers-1.82.0-ha770c72_6.conda
-  sha256: c996950b85808115ea833e577a0af2969dbb0378c299560c2b945401a7770823
-  md5: a943dcb8fd22cf23ce901ac84f6538c2
-  constrains:
-  - boost-cpp =1.82.0
-  license: BSL-1.0
-  size: 13700720
-  timestamp: 1696732043024
 - kind: conda
   name: libbrotlicommon
   version: 1.1.0
@@ -2587,53 +2491,34 @@ packages:
 - kind: conda
   name: mpi
   version: '1.0'
-  build: mpich
+  build: openmpi
   subdir: linux-64
-  url: https://conda.anaconda.org/conda-forge/linux-64/mpi-1.0-mpich.tar.bz2
-  sha256: cbe8f3bff576ce067141dc34811a6c5c9b56d0da50f28b3cdcc1d6d9661d484c
-  md5: c1fcff3417b5a22bbc4cf6e8c23648cf
+  url: https://conda.anaconda.org/conda-forge/linux-64/mpi-1.0-openmpi.tar.bz2
+  sha256: 54cf44ee2c122bce206f834a825af06e3b14fc4fd58c968ae9329715cc281d1e
+  md5: 1dcc49e16749ff79ba2194fa5d4ca5e7
   arch: x86_64
   platform: linux
   license: BSD 3-clause
-  size: 4184
+  size: 4204
 - kind: conda
   name: mpi4py
   version: 3.1.6
-  build: py310h30280a6_0
+  build: py310h2a790f2_0
   subdir: linux-64
-  url: https://conda.anaconda.org/conda-forge/linux-64/mpi4py-3.1.6-py310h30280a6_0.conda
-  sha256: ce15394ef5401a39939ffebf21a1880b2581656a3fa86023395cbeaa94d7efdf
-  md5: 2d37d1120377acaf724263aa895fc2a2
+  url: https://conda.anaconda.org/conda-forge/linux-64/mpi4py-3.1.6-py310h2a790f2_0.conda
+  sha256: c4ef1db2ae10af2ed87066874c678d53eda708e7fce84653c2f6b7594e5bd81f
+  md5: a3d12161fac2a9aea58a806a476a372a
   depends:
   - libgcc-ng >=12
-  - mpich >=4.2.0,<5.0a0
+  - openmpi >=4.1.6,<5.0a0
   - python >=3.10,<3.11.0a0
   - python_abi 3.10.* *_cp310
   license: BSD-2-Clause
   license_family: BSD
   purls:
-  - pkg:pypi/mpi4py
-  size: 540572
-  timestamp: 1713171963576
-- kind: conda
-  name: mpich
-  version: 4.2.1
-  build: h846660c_100
-  build_number: 100
-  subdir: linux-64
-  url: https://conda.anaconda.org/conda-forge/linux-64/mpich-4.2.1-h846660c_100.conda
-  sha256: de4349311b1b29ab6f2d0119a637fecffd5cc55febe554e8c8e24361f803dd22
-  md5: 47cb739baf9bdc016b19856961fa8835
-  depends:
-  - libgcc-ng >=12
-  - libgfortran-ng
-  - libgfortran5 >=12.3.0
-  - libstdcxx-ng >=12
-  - mpi 1.0 mpich
-  license: LicenseRef-MPICH
-  license_family: Other
-  size: 26254951
-  timestamp: 1713427704246
+  - pkg:pypi/mpi4py@3.1.6
+  size: 544275
+  timestamp: 1713171942114
 - kind: conda
   name: mumps-include
   version: 5.2.1
@@ -2649,12 +2534,12 @@ packages:
 - kind: conda
   name: mumps-mpi
   version: 5.2.1
-  build: h7ee95aa_11
+  build: hfb3545b_11
   build_number: 11
   subdir: linux-64
-  url: https://conda.anaconda.org/conda-forge/linux-64/mumps-mpi-5.2.1-h7ee95aa_11.tar.bz2
-  sha256: 290f40832a7de43264175feb5657ad09fdcb4bed67dc17881d8a3fe1b5dd36da
-  md5: 235559f5e16071637af9c1066ccd2121
+  url: https://conda.anaconda.org/conda-forge/linux-64/mumps-mpi-5.2.1-hfb3545b_11.tar.bz2
+  sha256: fee9b22355697ffa0ed288d1cb01d70041563c6c4c9d8822091f9654c9be2029
+  md5: 8cf8da26a2d1e4a6f07fc6597fd42de6
   depends:
   - libblas >=3.8.0,<4.0a0
   - libgcc-ng >=10.3.0
@@ -2662,15 +2547,15 @@ packages:
   - libgfortran5 >=10.3.0
   - liblapack >=3.8.0,<4.0a0
   - metis >=5.1.0,<5.1.1.0a0
-  - mpich >=4.0.1,<5.0a0
   - mumps-include 5.2.1 ha770c72_11
+  - openmpi >=4.1.2,<5.0a0
   - parmetis >=4.0.3,<4.1.0a0
   - ptscotch >=6.0.9,<6.0.10.0a0
   - scalapack >=2.2.0,<2.3.0a0
   - scotch >=6.0.9,<6.0.10.0a0
   license: CECILL-C
-  size: 3465876
-  timestamp: 1647025159971
+  size: 3772647
+  timestamp: 1647025254014
 - kind: conda
   name: munkres
   version: 1.1.4
@@ -2815,6 +2700,30 @@ packages:
   size: 341592
   timestamp: 1709159244431
 - kind: conda
+  name: openmpi
+  version: 4.1.6
+  build: hc5af2df_101
+  build_number: 101
+  subdir: linux-64
+  url: https://conda.anaconda.org/conda-forge/linux-64/openmpi-4.1.6-hc5af2df_101.conda
+  sha256: f0769dd891e1735be4606ec8643951e5cbca199f774e58c7d933f70a70134ce4
+  md5: f9a2ad0088ee38f396350515fa37d243
+  depends:
+  - libgcc-ng >=12
+  - libgfortran-ng
+  - libgfortran5 >=12.3.0
+  - libstdcxx-ng >=12
+  - libzlib >=1.2.13,<1.3.0a0
+  - mpi 1.0 openmpi
+  - zlib
+  constrains:
+  - cudatoolkit  >= 10.2
+  - ucx >=1.15.0,<2.0a0
+  license: BSD-3-Clause
+  license_family: BSD
+  size: 4069632
+  timestamp: 1696593196408
+- kind: conda
   name: openssl
   version: 3.2.1
   build: hd590300_1
@@ -2875,19 +2784,19 @@ packages:
 - kind: conda
   name: parmetis
   version: 4.0.3
-  build: h2a9763c_1005
+  build: he9a3056_1005
   build_number: 1005
   subdir: linux-64
-  url: https://conda.anaconda.org/conda-forge/linux-64/parmetis-4.0.3-h2a9763c_1005.tar.bz2
-  sha256: 5f070e718b6116718c58bd7831e18361096796b63c2ec394b2e497647d60bf1c
-  md5: d32150ac4a75576e7d8043379e7f1059
+  url: https://conda.anaconda.org/conda-forge/linux-64/parmetis-4.0.3-he9a3056_1005.tar.bz2
+  sha256: 20a46cebbec3c50cd0e33372112f962b69bba1082436fc095c90f65aadd43ffd
+  md5: 160999f9228e8aac87dc170f0810bc74
   depends:
   - libgcc-ng >=9.3.0
   - libstdcxx-ng >=9.3.0
-  - mpich >=3.4,<5.0.0a0
+  - openmpi >=4.1,<4.2.0a0
   license: Non-free for commercial use
-  size: 280747
-  timestamp: 1618817903676
+  size: 283747
+  timestamp: 1618817882449
 - kind: conda
   name: pcre2
   version: '10.43'
@@ -2906,28 +2815,29 @@ packages:
   timestamp: 1708118050286
 - kind: conda
   name: petsc
-  version: 3.19.6
-  build: complex_hd00473b_0
+  version: 3.17.4
+  build: complex_hff1c695_1
+  build_number: 1
   subdir: linux-64
-  url: https://conda.anaconda.org/conda-forge/linux-64/petsc-3.19.6-complex_hd00473b_0.conda
-  sha256: 3db9524690c2d018bc354bbe2d5d300643e91b36dfd9a7710794618b805d1dbd
-  md5: 05446b63bd39a0aa13291ab4f167e43d
+  url: https://conda.anaconda.org/conda-forge/linux-64/petsc-3.17.4-complex_hff1c695_1.tar.bz2
+  sha256: b17405118f31949fc119ac63a0038148af4fa204e0f59c790ba66bf5fabb2459
+  md5: a9df692e1cbc22ee169b91ad58f88acd
   depends:
-  - fftw * mpi_mpich_*
+  - fftw * mpi_openmpi_*
   - fftw >=3.3.10,<4.0a0
-  - hdf5 * mpi_mpich_*
-  - hdf5 >=1.14.2,<1.14.4.0a0 mpi_mpich_*
-  - hypre >=2.28.0,<2.28.1.0a0
+  - hdf5 * mpi_openmpi_*
+  - hdf5 >=1.12.2,<1.12.3.0a0 mpi_openmpi_*
+  - hypre >=2.25.0,<2.25.1.0a0
   - libblas >=3.9.0,<4.0a0
   - libcblas >=3.9.0,<4.0a0
   - libgcc-ng >=12
   - libgfortran-ng
-  - libgfortran5 >=12.3.0
+  - libgfortran5 >=10.4.0
   - liblapack >=3.9.0,<4.0a0
   - libstdcxx-ng >=12
-  - metis >=5.1.0,<5.2.0a0
-  - mpich >=4.1.2,<5.0a0
+  - metis >=5.1.0,<5.1.1.0a0
   - mumps-mpi >=5.2.1,<5.2.2.0a0
+  - openmpi >=4.1.4,<5.0a0
   - parmetis >=4.0.3,<4.1.0a0
   - ptscotch >=6.0.9,<6.0.10.0a0
   - scalapack >=2.2.0,<2.3.0a0
@@ -2940,23 +2850,24 @@ packages:
   - petsc_complex
   license: BSD-2-Clause
   license_family: BSD
-  size: 13020170
-  timestamp: 1695966692020
+  size: 15917762
+  timestamp: 1661244339151
 - kind: conda
   name: petsc4py
-  version: 3.19.6
-  build: complex_h2b98e23_0
+  version: 3.17.4
+  build: complex_hfddba75_1
+  build_number: 1
   subdir: linux-64
-  url: https://conda.anaconda.org/conda-forge/linux-64/petsc4py-3.19.6-complex_h2b98e23_0.conda
-  sha256: 0549c50dc1dcc3760a066ab97873e3e5921572b0c500986f0d577c58ee889ab1
-  md5: 07ec6c8cd17af46f7e81c9ad13141269
+  url: https://conda.anaconda.org/conda-forge/linux-64/petsc4py-3.17.4-complex_hfddba75_1.tar.bz2
+  sha256: 2be30ca9b2f720a7ad273366413a8cae8a8f1a6a2a365ae3bd79dde7ce2a69ab
+  md5: 29dfa22923dd206a68bc3d52fc037072
   depends:
   - libgcc-ng >=12
   - libgfortran-ng
-  - libgfortran5 >=12.3.0
-  - mpich >=4.1.2,<5.0a0
-  - numpy >=1.22.4,<2.0a0
-  - petsc >=3.19.6,<3.20.0a0 complex_*
+  - libgfortran5 >=10.4.0
+  - numpy >=1.21.6,<2.0a0
+  - openmpi >=4.1.4,<5.0a0
+  - petsc >=3.17.4,<3.18.0a0 complex_*
   - python >=3.10,<3.11.0a0
   - python_abi 3.10.* *_cp310
   constrains:
@@ -2966,9 +2877,9 @@ packages:
   license: BSD-2-Clause
   license_family: BSD
   purls:
-  - pkg:pypi/petsc4py
-  size: 1276483
-  timestamp: 1696405599644
+  - pkg:pypi/petsc4py@3.17.4
+  size: 1244946
+  timestamp: 1667409288463
 - kind: conda
   name: pillow
   version: 10.3.0
@@ -3078,20 +2989,20 @@ packages:
 - kind: conda
   name: ptscotch
   version: 6.0.9
-  build: hb499603_2
+  build: h0a9c416_2
   build_number: 2
   subdir: linux-64
-  url: https://conda.anaconda.org/conda-forge/linux-64/ptscotch-6.0.9-hb499603_2.tar.bz2
-  sha256: 81f68b9498721dc8ec65f723ecf46b569ee8109540858c440320acf1b7ba1089
-  md5: 2bb2d071f5cb419e4ce0e1eb7372eb9b
+  url: https://conda.anaconda.org/conda-forge/linux-64/ptscotch-6.0.9-h0a9c416_2.tar.bz2
+  sha256: c45c98ea3f3ee1648a801e13115c39005e2f9c378796edbf56c8cf2588ef2371
+  md5: 4e5d899d1d4704c80b3051eb01490bb2
   depends:
   - libgcc-ng >=10.3.0
   - libzlib >=1.2.11,<1.3.0a0
-  - mpich >=4.0.1,<5.0a0
+  - openmpi >=4.1.2,<5.0a0
   - scotch >=6.0.9,<6.0.10.0a0
   - zlib >=1.2.11,<1.3.0a0
-  size: 1620451
-  timestamp: 1646832737800
+  size: 1645596
+  timestamp: 1646832720457
 - kind: conda
   name: pugixml
   version: '1.13'
@@ -3423,29 +3334,29 @@ packages:
   name: saltx
   version: 0.1.0
   path: .
-  sha256: a3841b9ca3eb334b4ed2cee2fdf74e5ba01743003f611ec6e906a3914d87a164
+  sha256: 48a395decdc575b81e226cf44ed20e878c147d35a1db8fd950f24af9a4c9a634
   requires_python: '>=3.10'
   editable: true
 - kind: conda
   name: scalapack
   version: 2.2.0
-  build: hd931219_1
+  build: h67de57e_1
   build_number: 1
   subdir: linux-64
-  url: https://conda.anaconda.org/conda-forge/linux-64/scalapack-2.2.0-hd931219_1.tar.bz2
-  sha256: a2d5bfc5a1b83ea7907f3b9436db1f8431743f759c09ba6a4fad4ba06de49cee
-  md5: 9913f4fb198ea6d18ba99c45aed64855
+  url: https://conda.anaconda.org/conda-forge/linux-64/scalapack-2.2.0-h67de57e_1.tar.bz2
+  sha256: 84d4994cf823a8226b9bb4191a2f8a8111f5b1d561f06de0b0c22643362953d2
+  md5: 9f5631123fb242b76de37a6f0f2804cf
   depends:
   - libblas >=3.8.0,<4.0a0
   - libgcc-ng >=10.3.0
   - libgfortran-ng
   - libgfortran5 >=10.3.0
   - liblapack >=3.8.0,<4.0a0
-  - mpich >=4.0.1,<5.0a0
+  - openmpi >=4.1.2,<5.0a0
   license: BSD-2-Clause
   license_family: BSD
-  size: 2309433
-  timestamp: 1646818920200
+  size: 2310048
+  timestamp: 1646818926187
 - kind: conda
   name: scipy
   version: 1.13.0
@@ -3546,48 +3457,48 @@ packages:
   timestamp: 1620240338595
 - kind: conda
   name: slepc
-  version: 3.19.2
-  build: complex_hbef8606_0
+  version: 3.17.2
+  build: complex_h8a1df82_0
   subdir: linux-64
-  url: https://conda.anaconda.org/conda-forge/linux-64/slepc-3.19.2-complex_hbef8606_0.conda
-  sha256: 7965d3b0daa78c17f98f09f3d7960befc0c52023597092b059e146159990ccb0
-  md5: aa2f9c9a34ae680ce086a745d551107e
+  url: https://conda.anaconda.org/conda-forge/linux-64/slepc-3.17.2-complex_h8a1df82_0.tar.bz2
+  sha256: 27c995875ddbf211e78c70ad7a365924971919512087a453f528d63f21f8d521
+  md5: 2cc33d460d45fc35069c4882a466d774
   depends:
   - libblas >=3.9.0,<4.0a0
   - libcblas >=3.9.0,<4.0a0
   - libgcc-ng >=12
   - libgfortran-ng
-  - libgfortran5 >=12.3.0
+  - libgfortran5 >=10.4.0
   - liblapack >=3.9.0,<4.0a0
   - libstdcxx-ng >=12
-  - mpich >=4.1.2,<5.0a0
-  - petsc >=3.19.5,<3.20.0a0
-  - petsc >=3.19.5,<3.20.0a0 complex_*
+  - openmpi >=4.1.4,<5.0a0
+  - petsc >=3.17.4,<3.18.0a0
+  - petsc >=3.17.4,<3.18.0a0 complex_*
   - suitesparse >=5.10.1,<5.11.0a0
   track_features:
   - slepc_complex
   license: BSD-2-Clause
   license_family: BSD
-  size: 4692918
-  timestamp: 1694011965179
+  size: 5831085
+  timestamp: 1660058033602
 - kind: conda
   name: slepc4py
-  version: 3.19.2
-  build: complex_hbe3c240_1
+  version: 3.17.2
+  build: complex_hd010dac_1
   build_number: 1
   subdir: linux-64
-  url: https://conda.anaconda.org/conda-forge/linux-64/slepc4py-3.19.2-complex_hbe3c240_1.conda
-  sha256: 7a615ac9ce697c532c9581b3789bfc8a09e2dfd0717e0c88e1b03afebc897c80
-  md5: d876dc89d2ee326f3488e0d1a75b0b85
+  url: https://conda.anaconda.org/conda-forge/linux-64/slepc4py-3.17.2-complex_hd010dac_1.tar.bz2
+  sha256: 93e7ed912d9ce90c8f71ca199cd1f8382b42ac9bb48224b77d3102b74b8e685c
+  md5: d835a3e6bb5af091e596c1ce46883e6e
   depends:
   - libgcc-ng >=12
-  - mpich >=4.1.2,<5.0a0
-  - numpy >=1.22.4,<2.0a0
-  - petsc >=3.19.5,<3.20.0a0 complex_*
-  - petsc4py 3.19.*
+  - numpy >=1.21.6,<2.0a0
+  - openmpi >=4.1.4,<5.0a0
+  - petsc >=3.17.4,<3.18.0a0 complex_*
+  - petsc4py 3.17.*
   - python >=3.10,<3.11.0a0
   - python_abi 3.10.* *_cp310
-  - slepc >=3.19.2,<3.20.0a0 complex_*
+  - slepc >=3.17.2,<3.18.0a0 complex_*
   constrains:
   - mpi4py >=3.0.1
   track_features:
@@ -3595,9 +3506,9 @@ packages:
   license: BSD-2-Clause
   license_family: BSD
   purls:
-  - pkg:pypi/slepc4py
-  size: 369113
-  timestamp: 1695652070693
+  - pkg:pypi/slepc4py@3.17.2
+  size: 409731
+  timestamp: 1667460740741
 - kind: conda
   name: snappy
   version: 1.2.0
@@ -3656,11 +3567,11 @@ packages:
 - kind: conda
   name: superlu_dist
   version: 7.2.0
-  build: h25dcc4a_0
+  build: h34f6f4d_0
   subdir: linux-64
-  url: https://conda.anaconda.org/conda-forge/linux-64/superlu_dist-7.2.0-h25dcc4a_0.tar.bz2
-  sha256: 07b255249685c89d2430eac141ab2000ec3a7101931602db41d99e8d99c4ab9e
-  md5: fac36f70854e425ad3aaa30992d58c1b
+  url: https://conda.anaconda.org/conda-forge/linux-64/superlu_dist-7.2.0-h34f6f4d_0.tar.bz2
+  sha256: abaaac9e2b27a0fd6e9efd02daf8a4bf96d4b8ae7946d35b68a7399e2191817f
+  md5: 096b645a660e2d764771e73f732b6874
   depends:
   - _openmp_mutex >=4.5
   - libblas >=3.8.0,<4.0a0
@@ -3670,12 +3581,12 @@ packages:
   - liblapack >=3.8.0,<4.0a0
   - libstdcxx-ng >=9.4.0
   - metis >=5.1.0,<5.1.1.0a0
-  - mpich >=3.4.2,<5.0a0
+  - openmpi >=4.1.2,<5.0a0
   - parmetis >=4.0.3,<4.1.0a0
   license: BSD-3-Clause
   license_family: BSD
-  size: 1169589
-  timestamp: 1639429753397
+  size: 1171829
+  timestamp: 1639429754664
 - kind: conda
   name: sysroot_linux-64
   version: '2.12'
