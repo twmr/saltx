@@ -100,9 +100,17 @@ consider citing
 
 ## Installation
 
-It is recommended to install the python package from this git
-repository into a conda-environment, whose packages are listed in the
-`ci/requirements/py310.yml`.
+It is recommended that you clone this repo and use `pixi` for
+installing the dependencies, for building saltx and for running the
+unit-tests.
+
+To run the tests non-interactively call
+
+```console
+$ pixi run pytest --hide-plots
+```
+
+inside the root of the repository.
 
 ## Usage
 
