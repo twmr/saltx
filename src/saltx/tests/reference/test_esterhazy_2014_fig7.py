@@ -519,8 +519,6 @@ def refine_two_circulating_modes(rmode, mode2, newton_operators, nlp, bcs):
 def determine_circulating_mode_at_D0(
     system, system_quarter, D0: float
 ) -> tuple[complex, algorithms.NEVPNonLasingMode]:
-    bcs = create_bcs_on_quarter_mesh(system_quarter)
-
     modes, _ = solve_nevp_wrapper(
         system_quarter.ka,
         system_quarter.gt,
@@ -529,7 +527,7 @@ def determine_circulating_mode_at_D0(
         system_quarter.invperm,
         system_quarter.dielec,
         real_const(system_quarter.V, D0) * system_quarter.pump_profile,
-        bcs,
+        bcs=create_bcs_on_quarter_mesh(system_quarter),
     )
 
     defaultD0 = D0 == 0.1
