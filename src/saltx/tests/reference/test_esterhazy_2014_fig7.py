@@ -518,7 +518,10 @@ def refine_two_circulating_modes(rmode, mode2, newton_operators, nlp, bcs):
 
 def determine_circulating_mode_at_D0(
     system, system_quarter, D0: float
-) -> tuple[complex, algorithms.NEVPNonLasingMode]:
+) -> list[algorithms.NEVPNonLasingMode]:
+    """Determine the eigenmodes on the quarter mesh and then create circulating
+    modes on the full circle mesh."""
+
     modes, _ = solve_nevp_wrapper(
         system_quarter.ka,
         system_quarter.gt,
