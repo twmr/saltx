@@ -2,7 +2,7 @@
 name = "saltx"
 version = "0.1.0"
 authors = [
-  { name="Thomas Wimmer", email="thomaswimmer AT posteo DOT com" },
+  { name="Thomas Wimmer", email="thomaswimmer@posteo.com" },
 ]
 description = "An efficient FEM based laser mode solver"
 readme = "README.md"
