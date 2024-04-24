@@ -1,6 +1,6 @@
 # SALT + FEniCSx = saltx
 
-[![Continuous Integration](https://img.shields.io/github/actions/workflow/status/thisch/saltx/simple.yml?label=tests)](https://github.com/thisch/saltx/actions/workflows/simple.yml)
+[![Continuous Integration](https://img.shields.io/github/actions/workflow/status/twmr/saltx/simple.yml?label=tests)](https://github.com/twmr/saltx/actions/workflows/simple.yml)
 
 saltx is an efficient FEM based solver for the equations of the
 steady-state ab initio laser theory (SALT).
@@ -77,9 +77,9 @@ consider citing
 ```bibtex
 @misc{saltx,
   title = {saltx: An efficient FEM-based laser mode solver}
-  author = {Hisch, Thomas},
+  author = {Wimmer, Thomas},
   year = {2023},
-  note = {https://github.com/thisch/saltx},
+  note = {https://github.com/twmr/saltx},
 
 }
 @article{PhysRevA.90.023816,

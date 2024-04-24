@@ -1,6 +1,6 @@
-# Copyright (C) 2023 Thomas Hisch
+# Copyright (C) 2023 Thomas Wimmer
 #
-# This file is part of saltx (https://github.com/thisch/saltx)
+# This file is part of saltx (https://github.com/twmr/saltx)
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 """Reproduces results of "Scalable numerical approach for the steady-state ab
