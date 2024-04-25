@@ -212,7 +212,7 @@ def calculate_mode_and_intensity(
         newton_operators[1].L,
         newton_operators[1].delta_x,
         newton_operators[1].initial_x,
-        fail_early=False,
+        fail_early=True,
     )
 
     # TODO make sure that the other mode is below the threshold
