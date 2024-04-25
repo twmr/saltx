@@ -456,12 +456,13 @@ def constant_pump_algorithm(
         # Generalizations paper (Fig 3) due to the complicated eigenvalue trajectories
         # (function of D0)
         mode = modes[evals.imag.argmax()]
-        if mode.k.imag < -1e-10 and active_modes == 1:
-            # no mode above threshold found
-            return []
+        if active_modes == 1:
+            if mode.k.imag < -1e-10:
+                # no mode above threshold found
+                return []
 
-        if first_mode_index is not None and active_modes == 1:
-            mode = modes[first_mode_index]
+            if first_mode_index is not None:
+                mode = modes[first_mode_index]
 
         minfos.append(
             newtils.NewtonModeInfo(
