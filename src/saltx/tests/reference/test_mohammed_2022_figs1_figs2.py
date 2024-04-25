@@ -336,3 +336,190 @@ def test_single_mode_pump_trajectory_D1_0p95(system):
     ax2.legend()
 
     plt.show()
+
+
+def _refine_first_mode_and_calculate_nevp_again(
+    rmode, nevp_inputs, nlp, system, newton_operators
+):
+    minfos = [
+        newtils.NewtonModeInfo(
+            k=rmode.k.real,
+            s=0.1,
+            re_array=rmode.array.real,
+            im_array=rmode.array.imag,
+            dof_at_maximum=rmode.dof_at_maximum,
+        )
+    ]
+    refined_modes = algorithms.refine_modes(
+        minfos,
+        system.bcs,
+        newton_operators[1].solver,
+        nlp,
+        newton_operators[1].A,
+        newton_operators[1].L,
+        newton_operators[1].delta_x,
+        newton_operators[1].initial_x,
+        fail_early=True,
+    )
+
+    intens = np.sum(abs(system.evaluator(refined_modes[0])) ** 2)
+
+    # Now solve the eigenmodes again with a custom SHT
+    nlp.update_b_and_k_for_forms(refined_modes)
+
+    active_modes = 1
+    nevp_inputs.Q.zeroEntries()
+    fem.petsc.assemble_matrix(
+        nevp_inputs.Q, nlp.get_Q_hbt_form(active_modes), bcs=system.bcs, diagonal=0.0
+    )
+    nevp_inputs.Q.assemble()
+    log.debug("After assembly of Q with custom sht")
+
+    ctrl_modes = algorithms.get_nevp_modes(nevp_inputs)
+    ctrl_evals = np.asarray([cm.k for cm in ctrl_modes])
+    assert ctrl_evals.size == 2
+
+    return intens, ctrl_modes, ctrl_evals
+
+
+@pytest.mark.skip(reason="Too slow for the CI")
+def test_eval_traj_D1_0p85(system):
+    u = ufl.TrialFunction(system.V)
+    v = ufl.TestFunction(system.V)
+
+    fixed_D1 = 0.85
+    d1_constant = real_const(system.V, fixed_D1)
+    arbitrary_number = 1_200_300
+    d2_constant = real_const(system.V, arbitrary_number)
+
+    pump_expr = d1_constant * system.pump_left + d2_constant * system.pump_right
+
+    ds_obc = ufl.ds
+
+    L = assemble_form(
+        -inner(system.invperm * nabla_grad(u), nabla_grad(v)) * dx, system.bcs
+    )
+    M = assemble_form(system.dielec * inner(u, v) * dx, system.bcs, diag=0.0)
+    N = assemble_form(system.sigma_c * inner(u, v) * dx, system.bcs, diag=0.0)
+    R = assemble_form(inner(u, v) * ds_obc, system.bcs, diag=0.0)
+    Q = assemble_form(pump_expr * inner(u, v) * dx, system.bcs, diag=0.0)
+
+    nevp_inputs = algorithms.NEVPInputs(
+        ka=system.ka,
+        gt=system.gt,
+        rg_params=system.rg_params,
+        L=L,
+        M=M,
+        N=N,
+        Q=Q,
+        R=R,
+        bcs=system.bcs,
+    )
+
+    nlp = NonLinearProblem(
+        system.V,
+        system.ka,
+        system.gt,
+        dielec=system.dielec,
+        invperm=system.invperm,
+        n=system.n,
+        pump=pump_expr,
+        ds_obc=ds_obc,
+    )
+    nlp.sigma_c = system.sigma_c
+
+    newton_operators = newtils.create_multimode_solvers_and_matrices(nlp, max_nmodes=2)
+
+    all_d0vals = []
+    all_evals = []
+
+    all_rm_d0vals = []
+    all_rm_evals = []
+    all_rm_intens = []
+
+    # ratios = np.linspace(0.2, 0.9, 30)
+    # shows that after the shut-down the other mode starts to lase
+    # ratios = np.linspace(0.62, 0.68, 20)
+    ratios = np.linspace(0.62, 1.0, 30)
+    # ratios = np.linspace(0.40, 0.62, 30)
+    for d0ratio in ratios:
+        Print(f"##### Setting {d0ratio=}")
+        d2_constant.value = d0ratio * fixed_D1
+        assemble_form(pump_expr * inner(u, v) * dx, system.bcs, diag=0.0, mat=Q)
+
+        modes = algorithms.get_nevp_modes(nevp_inputs)
+        evals = np.asarray([mode.k for mode in modes])
+        assert evals.size == 2
+
+        all_d0vals.append(d0ratio)
+        all_evals.append(evals)
+
+        # should we also show the refined modes?
+
+        # rmode = modes[0]
+        # if rmode.k.imag < 1e-9:
+        #     if modes[1].k.imag > 1e-9:
+        #         rmode = modes[1]
+        #     else:
+        #         continue
+
+        # since we refine the mode with the highest imag part here, we get a slightly
+        # different result for the intensity trajectory.
+        rmode = modes[evals.imag.argmax()]
+        if rmode.k.imag < 1e-9:
+            continue
+
+        intens, ctrl_modes, ctrl_evals = _refine_first_mode_and_calculate_nevp_again(
+            rmode, nevp_inputs, nlp, system, newton_operators
+        )
+
+        all_rm_d0vals.append(d0ratio)
+        all_rm_evals.append(ctrl_evals)
+        all_rm_intens.append(intens)
+
+    fig, axes = plt.subplots(ncols=2)
+
+    ax = axes[0]
+    ax.scatter(
+        all_d0vals, [x[0].imag for x in all_evals], facecolors="none", edgecolors="b"
+    )
+    ax.scatter(
+        all_d0vals, [x[1].imag for x in all_evals], facecolors="none", edgecolors="r"
+    )
+
+    # refined modes
+    ax.plot(all_rm_d0vals, [x[0].imag for x in all_rm_evals], "x")
+    ax.plot(all_rm_d0vals, [x[1].imag for x in all_rm_evals], "x")
+
+    ax.set_title("Imag part of k vs D1/D2")
+    ax.grid(True)
+    ax.set_xlabel("D2/D1")
+
+    ax = axes[1]
+    ax.scatter(
+        all_d0vals, [x[0].real for x in all_evals], facecolors="none", edgecolors="b"
+    )
+    ax.scatter(
+        all_d0vals, [x[1].real for x in all_evals], facecolors="none", edgecolors="r"
+    )
+
+    # refined modes
+    ax.plot(all_rm_d0vals, [x[0].real for x in all_rm_evals], "x")
+    ax.plot(all_rm_d0vals, [x[1].real for x in all_rm_evals], "x")
+
+    ax.set_title("Real part of k vs D1/D2")
+    ax.grid(True)
+    ax.set_xlabel("D2/D1")
+
+    fig, ax = plt.subplots()
+    ax.plot(rdm.figs2a_data[:, 0], rdm.figs2a_data[:, 1], "x", label="paper reference")
+    correction_factor = 2.0
+    ax.plot(
+        all_rm_d0vals, np.array(all_rm_intens) / correction_factor, "x", label="saltx"
+    )
+    ax.grid(True)
+    ax.set_xlabel("D2/D1")
+    ax.set_xlabel("Intens of THE first lasermode")
+    ax.legend()
+
+    plt.show()
