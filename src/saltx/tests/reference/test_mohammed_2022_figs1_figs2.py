@@ -1,3 +1,13 @@
+# Copyright (C) 2024 Thomas Wimmer
+#
+# This file is part of saltx (https://github.com/twmr/saltx)
+#
+# SPDX-License-Identifier:    LGPL-3.0-or-later
+"""Reproduces results of "Nonlinear exceptional-point lasing with ab initio
+Maxwell-Bloch theory".
+
+See https://doi.org/10.1063/5.0105963
+"""
 import logging
 from collections import namedtuple
 from fractions import Fraction
