@@ -207,10 +207,12 @@ def calculate_mode_and_intensity(
 
     # TODO make sure that the other mode is below the threshold
 
-    fac = refined_modes[0].k.real / (2 * np.pi)  # f*a/c
+    first_mode = refined_modes[0]
+    fac = first_mode.k.real / (2 * np.pi)  # f*a/c
 
     # calculate the intensity of the mode at the two outer edges of the cavity
-    return fac, np.sum(abs(system.evaluator(refined_modes[0])) ** 2), refined_modes[0].s
+    intens = np.sum(abs(system.evaluator(first_mode)) ** 2)
+    return fac, intens, first_mode.s
 
 
 def test_single_mode_pump_trajectory_D1_0p85(system):
