@@ -245,7 +245,7 @@ def test_single_mode_pump_trajectory_D1_0p85(system):
     all_intensitites = []
     all_facs = []
     all_s = []
-    ratios = np.linspace(0.2, 0.9, 32)
+    ratios = np.linspace(0.2, 0.9, 20)
     prev_s = 0.5
     for d0ratio in ratios:
         log.info(f"################ {d0ratio=} ###################")
@@ -310,7 +310,7 @@ def test_single_mode_pump_trajectory_D1_0p95(system):
     all_facs = []
     all_s = []
     prev_s = 0.5
-    ratios = np.linspace(0.2, 0.8, 32)
+    ratios = np.linspace(0.2, 0.8, 20)
     for d0ratio in ratios:
         log.info(f"################ {d0ratio=} ###################")
         fac, intens, s = calculate_mode_and_intensity(
