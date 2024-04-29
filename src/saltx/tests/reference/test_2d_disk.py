@@ -178,18 +178,18 @@ def system():
         msh = fh.read_mesh(name="mcav")
     del fh
 
-    V = fem.FunctionSpace(msh, ("Lagrange", 4))
+    V = fem.functionspace(msh, ("Lagrange", 4))
 
     pml_start = 1.2
     pml_end = 1.8
 
     rectpml = RectPML(pml_start=pml_start, pml_end=pml_end)
 
-    invperm = fem.Function(fem.VectorFunctionSpace(msh, ("DG", 0)))
+    invperm = fem.Function(fem.functionspace(msh, ("DG", 0, (msh.geometry.dim,))))
     invperm.interpolate(rectpml.invperm_eval)
     invperm = ufl.as_vector((invperm[0], invperm[1]))
 
-    Qfs = fem.FunctionSpace(msh, ("DG", 0))
+    Qfs = fem.functionspace(msh, ("DG", 0))
     cav_dofs = fem.locate_dofs_geometrical(Qfs, lambda x: abs(x[0] + 1j * x[1]) <= 1.0)
 
     pump_profile = fem.Function(Qfs)

@@ -62,7 +62,7 @@ def system():
     msh = create_combined_interval_mesh(xstart, domains)
     dcells = create_dcells(msh, xstart, domains)
 
-    V_DG0 = fem.FunctionSpace(msh, ("DG", 0))
+    V_DG0 = fem.functionspace(msh, ("DG", 0))
     dielec = fem.Function(V_DG0)
     sigma_c = fem.Function(V_DG0)
     invperm = fem.Function(V_DG0)
@@ -100,7 +100,7 @@ def system():
     rg_params = (ka, radius, vscale)
     del radius, vscale
 
-    V = fem.FunctionSpace(msh, ("Lagrange", 3))
+    V = fem.functionspace(msh, ("Lagrange", 3))
 
     n = V.dofmap.index_map.size_global
     bcs = []

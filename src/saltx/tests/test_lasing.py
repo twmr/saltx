@@ -36,7 +36,7 @@ def test_assemble_F_and_J():
     Print(f"RG params: {rg_params}")
     msh = mesh.create_unit_interval(MPI.COMM_WORLD, nx=1000)
 
-    V = fem.FunctionSpace(msh, ("Lagrange", 3))
+    V = fem.functionspace(msh, ("Lagrange", 3))
 
     ds_obc = ufl.ds
     # Define Dirichlet boundary condition on the left

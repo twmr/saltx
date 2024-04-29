@@ -9,14 +9,15 @@ from fractions import Fraction
 
 import numpy as np
 import ufl
+from basix.ufl import element
 from dolfinx import mesh
 from mpi4py import MPI
 
 
 def create_combined_interval_mesh(xstart, domains):
     degree = 1
-    cell = ufl.Cell("interval", geometric_dimension=1)
-    domain = ufl.Mesh(ufl.VectorElement("Lagrange", cell, degree))
+    v_cg1 = element("Lagrange", "interval", degree, shape=(1,))
+    domain = ufl.Mesh(v_cg1)
 
     xcur = xstart
 
@@ -43,7 +44,7 @@ def create_combined_interval_mesh(xstart, domains):
     # why do we need a domain for create_mesh and not for create_unit_interval?
     return mesh.create_mesh(MPI.COMM_WORLD, cells, vertices, domain)
 
-    # V = fem.FunctionSpace(msh, ("P", 1))
+    # V = fem.functionspace(msh, ("P", 1))
     # log.info(V.tabulate_dof_coordinates(), msh.geometry.dim)
     # log.info(msh.topology.index_map(msh.topology.dim).size_local)
 

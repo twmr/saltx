@@ -85,7 +85,7 @@ def system(bc_type):
     else:
         msh = mesh.create_unit_interval(MPI.COMM_WORLD, nx=1000)
 
-    V = fem.FunctionSpace(msh, ("Lagrange", 3))
+    V = fem.functionspace(msh, ("Lagrange", 3))
 
     evaluator = algorithms.Evaluator(
         V,

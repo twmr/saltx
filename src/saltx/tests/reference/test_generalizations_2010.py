@@ -83,10 +83,10 @@ def system():
     msh = create_combined_interval_mesh(xstart, domains)
     dcells = create_dcells(msh, xstart, domains)
 
-    dielec = fem.Function(fem.FunctionSpace(msh, ("DG", 0)))
-    pump_profile = fem.Function(fem.FunctionSpace(msh, ("DG", 0)))
+    dielec = fem.Function(fem.functionspace(msh, ("DG", 0)))
+    pump_profile = fem.Function(fem.functionspace(msh, ("DG", 0)))
     if use_pml:
-        invperm = fem.Function(fem.FunctionSpace(msh, ("DG", 0)))
+        invperm = fem.Function(fem.functionspace(msh, ("DG", 0)))
     else:
         invperm = 1
 
@@ -133,7 +133,7 @@ def system():
             cset(invperm, cells, 1)
             cset(pump_profile, cells, 0.0)
 
-    V = fem.FunctionSpace(msh, ("Lagrange", 3))
+    V = fem.functionspace(msh, ("Lagrange", 3))
 
     evaluator = algorithms.Evaluator(
         V,

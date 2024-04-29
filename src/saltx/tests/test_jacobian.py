@@ -36,7 +36,7 @@ def ass_linear_form_into_vec(vec, form, a_form, bcs):
 def test_create_salt_jacobian_block_matrix(nmodes):
     mesh = dolfinx.mesh.create_unit_interval(MPI.COMM_WORLD, 5)
 
-    V = fem.FunctionSpace(mesh, ("Lagrange", 1))
+    V = fem.functionspace(mesh, ("Lagrange", 1))
     tstf = ufl.TestFunction(V)
     trif = ufl.TrialFunction(V)
     dFRe_dv = inner(trif, tstf) * dx
@@ -229,7 +229,7 @@ def test_create_salt_jacobian_block_matrix(nmodes):
 @pytest.mark.parametrize("nmodes", [1, 2])
 def test_create_and_assemble_salt_jacobian(nmodes):
     msh = mesh.create_unit_interval(MPI.COMM_WORLD, nx=3000)
-    V = fem.FunctionSpace(msh, ("Lagrange", 3))
+    V = fem.functionspace(msh, ("Lagrange", 3))
 
     Wre, Wim = V.clone(), V.clone()
 
