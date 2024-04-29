@@ -117,7 +117,11 @@ def real_const(V, real_value: float) -> fem.Constant:
 
 
 def calculate_mode_and_intensity(
-    system, D1: int, D2: int, initial_s: float
+    system,
+    D1: int,
+    D2: int,
+    initial_s: float,
+    refine_mode_with_kimag_max: bool = False,
 ) -> tuple[float, float, float]:
     """Calculate the first laser mode.
 
@@ -130,6 +134,9 @@ def calculate_mode_and_intensity(
         pump strength in the right wedge
     initial_s
         initial guess of the parameter s (the amplitude) of the first mode
+    refine_mode_with_kimag_max
+        If not set to `True`, the first mode returned by the NEVP is used for the
+        refinement. Otherwise, the mode with the highest `k.imag` is used.
 
     Returns
     -------
@@ -188,10 +195,17 @@ def calculate_mode_and_intensity(
 
     newton_operators = newtils.create_multimode_solvers_and_matrices(nlp, max_nmodes=1)
 
-    if evals.imag.max() < 1e-9:
-        return np.nan, 0.0, 1.0
-
-    rmode = modes[0]
+    if refine_mode_with_kimag_max:
+        if evals.imag.max() <= 1e-9:
+            return np.nan, 0.0, 1.0
+        idx = evals.imag.argmax()
+    else:
+        # In order to match the results of the paper the "first" mode is refined even
+        # though the other sometimes has a higher k.imag.
+        if evals[0].imag <= 1e-9:
+            return np.nan, 0.0, 1.0
+        idx = 0
+    rmode = modes[idx]
     assert rmode.k.imag > 1e-9
     minfos = [
         newtils.NewtonModeInfo(
