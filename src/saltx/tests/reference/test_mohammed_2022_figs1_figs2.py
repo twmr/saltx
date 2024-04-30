@@ -250,10 +250,8 @@ def test_single_mode_pump_trajectory_D1_0p85(system):
     assert fac == pytest.approx(1.0013936748532917, rel=1e-4)
     assert s == pytest.approx(0.33704142485274613, rel=1e-4)
 
-    figs2a, ax1 = plt.subplots()
+    fig, (ax1, ax2) = plt.subplots(nrows=2, sharex=True, figsize=(7, 9))
     ax1.plot(rdm.figs2a_data[:, 0], rdm.figs2a_data[:, 1], "x", label="paper reference")
-
-    figs2b, ax2 = plt.subplots()
     ax2.plot(rdm.figs2b_data[:, 0], rdm.figs2b_data[:, 1], "x", label="paper reference")
 
     all_intensitites = []
@@ -281,8 +279,8 @@ def test_single_mode_pump_trajectory_D1_0p85(system):
     ax1.axvline(x=D2D1_turnon)
     ax1.legend()
 
-    ax2.plot(ratios, all_facs, "-", label="saltx")
-    ax1.grid(True)
+    ax2.plot(ratios, all_facs, "-x", label="saltx")
+    ax2.grid(True)
     ax2.set_xlabel("D2/D1")
     ax2.set_ylabel("f*a/c")
     ax2.axvline(x=D2D1_shutoff)
@@ -304,7 +302,10 @@ def test_single_mode_pump_trajectory_D1_0p95(system):
     assert fac == pytest.approx(1.0013936748532917, rel=1e-4)
     assert s == pytest.approx(0.5481240251516201, rel=1e-4)
 
-    figs2a, ax1 = plt.subplots()
+    fig, (ax1, ax2) = plt.subplots(nrows=2, sharex=True, figsize=(7, 9))
+    # ax1 = fig S1 a)
+    # ax2 = fig S1 b)
+
     ax1.plot(
         rdm.figs1_intensity_single_mode_data[:, 0],
         rdm.figs1_intensity_single_mode_data[:, 1],
@@ -312,7 +313,6 @@ def test_single_mode_pump_trajectory_D1_0p95(system):
         label="paper reference",
     )
 
-    figs2b, ax2 = plt.subplots()
     ax2.plot(
         rdm.figs1_freq_mode1_data[:, 0],
         rdm.figs1_freq_mode1_data[:, 1],
@@ -343,8 +343,8 @@ def test_single_mode_pump_trajectory_D1_0p95(system):
     ax1.set_ylabel("Mode Intensity")
     ax1.legend()
 
-    ax2.plot(ratios, all_facs, "-", label="saltx")
-    ax1.grid(True)
+    ax2.plot(ratios, all_facs, "-x", label="saltx")
+    ax2.grid(True)
     ax2.set_xlabel("D2/D1")
     ax2.set_ylabel("f*a/c")
     ax2.legend()
