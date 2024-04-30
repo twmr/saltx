@@ -57,8 +57,8 @@ saltx = { path = ".", editable = true }
 [tool.pixi.tasks]
 
 [tool.pixi.dependencies]
-fenics-dolfinx = "0.7.3.*"
-pytest = ">=8.1.1,<8.2"
+fenics-dolfinx = "0.8.0.*"
+pytest = ">=8.2"
 matplotlib = ">=3.8.4,<3.9"
 pandas = ">=2.2.2,<2.3"
 scipy = ">=1.13.0,<1.14"
