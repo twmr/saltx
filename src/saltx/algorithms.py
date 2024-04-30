@@ -339,7 +339,7 @@ def _refine_modes(
     sanity_checks = False  # could be disabled in the future
     while i < max_iterations and converged is None:
         tstart = time.monotonic()
-        with Timer(Print, "assemble J matrix and F vec"):
+        with Timer(log.info, "assemble J matrix and F vec"):
             nlp.assemble_F_and_J(nlL, nlA, minfos, bcs)
 
         nlL.ghostUpdate(
@@ -355,7 +355,7 @@ def _refine_modes(
             newtils.check_vector_real(nlL, nmodes=nmodes)
             newtils.check_matrix_real(nlA, nmodes=nmodes)
 
-        with Timer(Print, "Solve KSP"):
+        with Timer(log.info, "Solve KSP"):
             solver.solve(nlL, delta_x)
 
         initial_x += delta_x * relaxation_parameter

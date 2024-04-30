@@ -12,18 +12,20 @@ from saltx.log import Timer
 log = logging.getLogger(__name__)
 
 
-def assemble_form(form, bcs, diag=1.0, mat=None):
+def assemble_form(form, bcs, diag=1.0, mat=None, name=""):
     if isinstance(form, fem.forms.Form):
-        log.error("fem.form form already created")
+        log.warning(f"fem.form {name} already created")
         fform = form
     else:
-        with Timer(log.error, "assemble_form"):
+        with Timer(log.info, f"assemble_form {name}"):
             fform = fem.form(form)
 
-    if mat is None:
-        mat = fem.petsc.assemble_matrix(fform, bcs=bcs, diagonal=diag)
-    else:
-        mat.zeroEntries()
-        fem.petsc.assemble_matrix(mat, fform, bcs=bcs, diagonal=diag)
-    mat.assemble()
+    suffix = ", new matrix" if mat is None else ", existing matrix"
+    with Timer(log.info, f"assemble_matrix {name}{suffix}"):
+        if mat is None:
+            mat = fem.petsc.assemble_matrix(fform, bcs=bcs, diagonal=diag)
+        else:
+            mat.zeroEntries()
+            fem.petsc.assemble_matrix(mat, fform, bcs=bcs, diagonal=diag)
+        mat.assemble()
     return mat

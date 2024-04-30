@@ -303,9 +303,11 @@ def solve_nevp_wrapper(
         assert isinstance(local_bcs, list)
         Print(f"------------> Now solving modes with bcs={bcs_name}")
 
-        L = assemble_form(-inner(elem_mult(invperm, curl(u)), curl(v)) * dx, local_bcs)
-        M = assemble_form(dielec * inner(u, v) * dx, local_bcs, diag=0.0)
-        Q = assemble_form(pump * inner(u, v) * dx, local_bcs, diag=0.0)
+        L = assemble_form(
+            -inner(elem_mult(invperm, curl(u)), curl(v)) * dx, local_bcs, name="L"
+        )
+        M = assemble_form(dielec * inner(u, v) * dx, local_bcs, diag=0.0, name="M")
+        Q = assemble_form(pump * inner(u, v) * dx, local_bcs, diag=0.0, name="Q")
 
         Print(
             f"{L.getSize()=},  DOF: {L.getInfo()['nz_used']}, MEM:"
@@ -717,11 +719,15 @@ def test_solve_multimode_D0range(system, system_quarter, D0_range):
                 gt=system.gt,
                 rg_params=system.rg_params,
                 L=assemble_form(
-                    -inner(elem_mult(system.invperm, curl(_u)), curl(_v)) * dx, bcs
+                    -inner(elem_mult(system.invperm, curl(_u)), curl(_v)) * dx,
+                    bcs,
+                    name="Lctrl",
                 ),
-                M=assemble_form(system.dielec * inner(_u, _v) * dx, bcs, diag=0.0),
+                M=assemble_form(
+                    system.dielec * inner(_u, _v) * dx, bcs, diag=0.0, name="Mctrl"
+                ),
                 N=None,
-                Q=assemble_form(Q_form, bcs, diag=0.0),
+                Q=assemble_form(Q_form, bcs, diag=0.0, name="Qctrl"),
                 R=None,
                 bcs=bcs,
             )
@@ -874,11 +880,15 @@ def test_solve_multimode_D0range(system, system_quarter, D0_range):
                 gt=system.gt,
                 rg_params=system.rg_params,
                 L=assemble_form(
-                    -inner(elem_mult(system.invperm, curl(_u)), curl(_v)) * dx, bcs
+                    -inner(elem_mult(system.invperm, curl(_u)), curl(_v)) * dx,
+                    bcs,
+                    name="Lctrl",
                 ),
-                M=assemble_form(system.dielec * inner(_u, _v) * dx, bcs, diag=0.0),
+                M=assemble_form(
+                    system.dielec * inner(_u, _v) * dx, bcs, diag=0.0, name="Mctrl"
+                ),
                 N=None,
-                Q=assemble_form(Q_form, bcs, diag=0.0),
+                Q=assemble_form(Q_form, bcs, diag=0.0, name="Qctrl"),
                 R=None,
                 bcs=bcs,
             )

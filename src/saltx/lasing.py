@@ -119,7 +119,8 @@ class NonLinearProblem:
             sht += abs(gk * b) ** 2
 
         # create the final Q form
-        return fem.form(self.pump / (1 + sht) * inner(u, v) * dx)
+        with Timer(log.info, f"Calling fem.form(Q_hbt[{nmodes=}])"):
+            return fem.form(self.pump / (1 + sht) * inner(u, v) * dx)
 
     def _create_newton_forms(self, nmodes):
         spaces = self._max_spaces[:nmodes]
@@ -631,19 +632,13 @@ class NonLinearProblem:
 
         try:
             matvec_coll = self.matvec_coll_map[nmodes]
+            log.debug(f"Returned cached matvec coll for {nmodes} modes")
         except KeyError:
-            with Timer(log.debug, "creation of sparse dF_dvw matrix and vectors"):
-                log.debug("BEFORE CMB")
+            with Timer(log.warning, "creation of sparse dF_dvw matrix and vectors"):
                 mat_dF_dvw = create_matrix_block(a_form_array)
-                log.debug("AFTER CMB")
-
                 vec_F_petsc = create_vector_block(F_components)
-                log.debug("AFTER CVB")
                 vec_dF_dk_seq = [create_vector_block(dF_dk) for dF_dk in dF_dk_seq]
-                log.debug("AFTER CVB (dF_dk_seq)")
-
                 vec_dF_ds_seq = [create_vector_block(dF_ds) for dF_ds in dF_ds_seq]
-                log.debug("AFTER CVB (dF_ds_seq)")
                 matvec_coll = MatVecCollection(
                     mat_dF_dvw=mat_dF_dvw,
                     vec_F_petsc=vec_F_petsc,
