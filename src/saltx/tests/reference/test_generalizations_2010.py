@@ -617,41 +617,41 @@ def test_intensity_vs_pump(system):
     # different definitions of the intensities.
     scale = 12  # where does this come from?
     data = np.loadtxt(reference_test_dir / "solid-and-open-red.csv", delimiter=",")
-    ax.plot(data[:, 0], data[:, 1] * scale, "ro", alpha=0.2)
+    ax.plot(data[:, 0], data[:, 1] * scale, "ro", alpha=0.2, label="paper")
     data = np.loadtxt(reference_test_dir / "solid-and-open-blue.csv", delimiter=",")
-    ax.plot(data[:, 0], data[:, 1] * scale, "bo", alpha=0.2)
+    ax.plot(data[:, 0], data[:, 1] * scale, "bo", alpha=0.2, label="paper")
 
     x = np.asarray([D0 for (D0, _, _) in results])
     y = np.asarray([intens for (_, _, intens) in results])
-    ax.plot(
-        x,
-        y,
-        "kx",
-    )
+    ax.plot(x, y, "kx", label="saltx")
     ax.set_xlabel("Pump D0")
     ax.set_ylabel("Modal intensity at right lead + left lead")
     ax.axvline(x=FIRST_THRESHOLD)
+    ax.legend()
     ax.grid(True)
 
     _, axes = plt.subplots(nrows=2, sharex=True)
-    y = np.asarray([k for (_, k, _) in results])
+    y = np.asarray([k_real for (_, k_real, _) in results])
+    k_separation = 16.0
 
     axes[0].plot(
-        x[y < 16],
-        y[y < 16],
+        x[y < k_separation],
+        y[y < k_separation],
         "x",
     )
+    axes[0].set_title("mode1")
     axes[0].grid(True)
-    axes[0].set_xlabel("k.real Mode 1")
+    axes[0].set_ylabel("k.real")
 
     axes[1].plot(
-        x[y > 16],
-        y[y > 16],
+        x[y > k_separation],
+        y[y > k_separation],
         "x",
     )
+    axes[1].set_title("mode2")
     axes[1].grid(True)
-    axes[1].set_xlabel("k.real Mode 2")
     axes[1].set_xlabel("Pump D0")
+    axes[1].set_ylabel("k.real")
 
     plot_ciss_eigenvalues(
         np.concatenate(aevals), params=system.rg_params, kagt=(system.ka, system.gt)
