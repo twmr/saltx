@@ -32,6 +32,7 @@ from saltx.assemble import assemble_form
 from saltx.lasing import NonLinearProblem
 from saltx.plot import plot_ellipse, plot_meshfunctions
 from saltx.pml import RectPML
+from saltx.trace import tracer
 
 repo_dir = Path(__file__).parent.parent.parent.parent.parent
 
@@ -298,16 +299,20 @@ def solve_nevp_wrapper(
     u = ufl.TrialFunction(V)
     v = ufl.TestFunction(V)
 
+    with tracer.span("assemble_forms LMQ"):
+        Lform = fem.form(-inner(elem_mult(invperm, curl(u)), curl(v)) * dx)
+        Mform = fem.form(dielec * inner(u, v) * dx)
+        Qform = fem.form(pump * inner(u, v) * dx)
+
     all_modes = []
     for bcs_name, local_bcs in bcs.items():
         assert isinstance(local_bcs, list)
         Print(f"------------> Now solving modes with bcs={bcs_name}")
 
-        L = assemble_form(
-            -inner(elem_mult(invperm, curl(u)), curl(v)) * dx, local_bcs, name="L"
-        )
-        M = assemble_form(dielec * inner(u, v) * dx, local_bcs, diag=0.0, name="M")
-        Q = assemble_form(pump * inner(u, v) * dx, local_bcs, diag=0.0, name="Q")
+        with tracer.span("assemble_matrices LMQ"):
+            L = assemble_form(Lform, local_bcs, name="L")
+            M = assemble_form(Mform, local_bcs, diag=0.0, name="M")
+            Q = assemble_form(Qform, local_bcs, diag=0.0, name="Q")
 
         Print(
             f"{L.getSize()=},  DOF: {L.getInfo()['nz_used']}, MEM:"
@@ -325,12 +330,14 @@ def solve_nevp_wrapper(
             R=None,
             bcs=local_bcs,
         )
-        all_modes.extend(
-            algorithms.get_nevp_modes(
-                nevp_inputs,
-                bcs_name=bcs_name,
+
+        with tracer.span("solve NEVP"):
+            all_modes.extend(
+                algorithms.get_nevp_modes(
+                    nevp_inputs,
+                    bcs_name=bcs_name,
+                )
             )
-        )
     evals = np.asarray([mode.k for mode in all_modes])
 
     sorted_evals = np.sort_complex(evals)
@@ -633,9 +640,10 @@ def test_solve_multimode_D0range(system, system_quarter, D0_range):
     D0_start = D0_range[0]
 
     # the circulating mode is a FEM function on the full (circle) system
-    circulating_modes = determine_circulating_mode_at_D0(
-        system, system_quarter, D0=D0_start
-    )
+    with tracer.span("circulating_mode_at_D0"):
+        circulating_modes = determine_circulating_mode_at_D0(
+            system, system_quarter, D0=D0_start
+        )
 
     fem_mode = fem.Function(system.V)
     internal_intensity_form = fem.form(abs(fem_mode) ** 2 * system.dx_circle)
@@ -661,7 +669,11 @@ def test_solve_multimode_D0range(system, system_quarter, D0_range):
         pump=D0_constant_circle * system.pump_profile,
         ds_obc=None,
     )
-    newton_operators = newtils.create_multimode_solvers_and_matrices(nlp, max_nmodes=2)
+
+    with tracer.span("create_mmode_solvers"):
+        newton_operators = newtils.create_multimode_solvers_and_matrices(
+            nlp, max_nmodes=2
+        )
 
     circulating_mode_results = {}
     for circulating_mode in circulating_modes:
@@ -680,16 +692,17 @@ def test_solve_multimode_D0range(system, system_quarter, D0_range):
 
         bcs = circulating_mode.bcs
         D0_constant_circle.value = D0_range[0]
-        refined_modes = algorithms.refine_modes(
-            minfos,
-            bcs,
-            newton_operators[active_modes].solver,
-            nlp,
-            newton_operators[active_modes].A,
-            newton_operators[active_modes].L,
-            newton_operators[active_modes].delta_x,
-            newton_operators[active_modes].initial_x,
-        )
+        with tracer.span("refine_single_circulating_mode"):
+            refined_modes = algorithms.refine_modes(
+                minfos,
+                bcs,
+                newton_operators[active_modes].solver,
+                nlp,
+                newton_operators[active_modes].A,
+                newton_operators[active_modes].L,
+                newton_operators[active_modes].delta_x,
+                newton_operators[active_modes].initial_x,
+            )
         assert all(rm.converged for rm in refined_modes)
         assert len(refined_modes) == active_modes
         assert all(rmode.k.imag < 1e-9 for rmode in refined_modes)
@@ -713,25 +726,26 @@ def test_solve_multimode_D0range(system, system_quarter, D0_range):
         _u = ufl.TrialFunction(system.V)
         _v = ufl.TestFunction(system.V)
 
-        ctrl_modes = algorithms.get_nevp_modes(
-            algorithms.NEVPInputs(
-                ka=system.ka,
-                gt=system.gt,
-                rg_params=system.rg_params,
-                L=assemble_form(
-                    -inner(elem_mult(system.invperm, curl(_u)), curl(_v)) * dx,
-                    bcs,
-                    name="Lctrl",
-                ),
-                M=assemble_form(
-                    system.dielec * inner(_u, _v) * dx, bcs, diag=0.0, name="Mctrl"
-                ),
-                N=None,
-                Q=assemble_form(Q_form, bcs, diag=0.0, name="Qctrl"),
-                R=None,
-                bcs=bcs,
+        with tracer.span("determine_nevp_ctrl_modes_for_one_active_mode"):
+            ctrl_modes = algorithms.get_nevp_modes(
+                algorithms.NEVPInputs(
+                    ka=system.ka,
+                    gt=system.gt,
+                    rg_params=system.rg_params,
+                    L=assemble_form(
+                        -inner(elem_mult(system.invperm, curl(_u)), curl(_v)) * dx,
+                        bcs,
+                        name="Lctrl",
+                    ),
+                    M=assemble_form(
+                        system.dielec * inner(_u, _v) * dx, bcs, diag=0.0, name="Mctrl"
+                    ),
+                    N=None,
+                    Q=assemble_form(Q_form, bcs, diag=0.0, name="Qctrl"),
+                    R=None,
+                    bcs=bcs,
+                )
             )
-        )
 
         ctrl_evals = np.asarray([cm.k for cm in ctrl_modes])
 
@@ -771,13 +785,13 @@ def test_solve_multimode_D0range(system, system_quarter, D0_range):
 
         # find the 2 ctrl_modes above threshold, and create a circulating mode
         mode2 = find_circulating_mode_above_real_axis(ctrl_modes)
-        Print("Refine two circulating modes")
-        try:
-            refined_modes = refine_two_circulating_modes(
-                refined_modes[0], mode2, newton_operators, nlp, bcs
-            )
-        except algorithms.RefinementError:
-            continue
+        with tracer.span("Refine two circulating modes"):
+            try:
+                refined_modes = refine_two_circulating_modes(
+                    refined_modes[0], mode2, newton_operators, nlp, bcs
+                )
+            except algorithms.RefinementError:
+                continue
         minfos = [
             newtils.NewtonModeInfo(
                 k=rmode.k.real,
@@ -810,31 +824,34 @@ def test_solve_multimode_D0range(system, system_quarter, D0_range):
         D0_constant_circle.value = D0
         while True:
             log.info(f"In while True body D0={D0}")
-            try:
-                refined_modes = algorithms.refine_modes(
-                    minfos,
-                    bcs,
-                    newton_operators[active_modes].solver,
-                    nlp,
-                    newton_operators[active_modes].A,
-                    newton_operators[active_modes].L,
-                    newton_operators[active_modes].delta_x,
-                    newton_operators[active_modes].initial_x,
-                    fail_early=True,
-                )
-                break
-            except algorithms.RefinementError:
-                if len(minfos) > 1:
-                    log.warning("Check for shut-down of mode")
-                    # try to decrease minfos and check if refine_mode converges
+            with tracer.span("refine_modes", D0=D0, active_modes=active_modes):
+                try:
+                    refined_modes = algorithms.refine_modes(
+                        minfos,
+                        bcs,
+                        newton_operators[active_modes].solver,
+                        nlp,
+                        newton_operators[active_modes].A,
+                        newton_operators[active_modes].L,
+                        newton_operators[active_modes].delta_x,
+                        newton_operators[active_modes].initial_x,
+                        fail_early=True,
+                    )
+                    break
+                except algorithms.RefinementError:
+                    if len(minfos) > 1:
+                        log.warning("Check for shut-down of mode")
+                        # try to decrease minfos and check if refine_mode converges
 
-                    # TODO use a better metric to determine the mode that shut down.
-                    # minfos = minfos[:1]
-                    minfos = minfos[1:]
-                    log.warning(f"Check if mode at k={minfos[0].k} is a lasing mode")
-                    active_modes = 1
-                else:
-                    raise
+                        # TODO use a better metric to determine the mode that shut down.
+                        # minfos = minfos[:1]
+                        minfos = minfos[1:]
+                        log.warning(
+                            f"Check if mode at k={minfos[0].k} is a lasing mode"
+                        )
+                        active_modes = 1
+                    else:
+                        raise
 
         log.info(f"--------> after while True loop at D0={D0}")
         assert all(rm.converged for rm in refined_modes)
@@ -874,25 +891,26 @@ def test_solve_multimode_D0range(system, system_quarter, D0_range):
         _u = ufl.TrialFunction(system.V)
         _v = ufl.TestFunction(system.V)
 
-        ctrl_modes = algorithms.get_nevp_modes(
-            algorithms.NEVPInputs(
-                ka=system.ka,
-                gt=system.gt,
-                rg_params=system.rg_params,
-                L=assemble_form(
-                    -inner(elem_mult(system.invperm, curl(_u)), curl(_v)) * dx,
-                    bcs,
-                    name="Lctrl",
-                ),
-                M=assemble_form(
-                    system.dielec * inner(_u, _v) * dx, bcs, diag=0.0, name="Mctrl"
-                ),
-                N=None,
-                Q=assemble_form(Q_form, bcs, diag=0.0, name="Qctrl"),
-                R=None,
-                bcs=bcs,
+        with tracer.span(f"D0_{D0}_nevp_ctrl_modes_"):
+            ctrl_modes = algorithms.get_nevp_modes(
+                algorithms.NEVPInputs(
+                    ka=system.ka,
+                    gt=system.gt,
+                    rg_params=system.rg_params,
+                    L=assemble_form(
+                        -inner(elem_mult(system.invperm, curl(_u)), curl(_v)) * dx,
+                        bcs,
+                        name="Lctrl",
+                    ),
+                    M=assemble_form(
+                        system.dielec * inner(_u, _v) * dx, bcs, diag=0.0, name="Mctrl"
+                    ),
+                    N=None,
+                    Q=assemble_form(Q_form, bcs, diag=0.0, name="Qctrl"),
+                    R=None,
+                    bcs=bcs,
+                )
             )
-        )
         ctrl_evals = np.asarray([cm.k for cm in ctrl_modes])
         current_pump_step_results.nevp_eigenvalues = ctrl_evals.tolist()
 
@@ -921,9 +939,10 @@ def test_solve_multimode_D0range(system, system_quarter, D0_range):
             # find the 2 ctrl_modes above threshold, and create a circulating mode
             mode2 = find_circulating_mode_above_real_axis(ctrl_modes)
 
-            refined_modes = refine_two_circulating_modes(
-                refined_modes[0], mode2, newton_operators, nlp, bcs
-            )
+            with tracer.span("Refine two circulating modes"):
+                refined_modes = refine_two_circulating_modes(
+                    refined_modes[0], mode2, newton_operators, nlp, bcs
+                )
             minfos = [
                 newtils.NewtonModeInfo(
                     k=rmode.k.real,

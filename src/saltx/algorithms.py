@@ -18,7 +18,7 @@ from petsc4py import PETSc
 from slepc4py import SLEPc
 
 from saltx import newtils
-from saltx.log import Timer
+from saltx.trace import tracer
 
 if typing.TYPE_CHECKING:
     from saltx.lasing import NonLinearProblem
@@ -339,7 +339,7 @@ def _refine_modes(
     sanity_checks = False  # could be disabled in the future
     while i < max_iterations and converged is None:
         tstart = time.monotonic()
-        with Timer(log.info, "assemble J matrix and F vec"):
+        with tracer.span(f"_refine_mode[{i=}]: assemble J matrix and F vec"):
             nlp.assemble_F_and_J(nlL, nlA, minfos, bcs)
 
         nlL.ghostUpdate(
@@ -355,7 +355,7 @@ def _refine_modes(
             newtils.check_vector_real(nlL, nmodes=nmodes)
             newtils.check_matrix_real(nlA, nmodes=nmodes)
 
-        with Timer(log.info, "Solve KSP"):
+        with tracer.span(f"_refine_mode[{i=}]: Solve KSP"):
             solver.solve(nlL, delta_x)
 
         initial_x += delta_x * relaxation_parameter

@@ -17,6 +17,7 @@ from ufl import dx, elem_mult, inner, nabla_grad
 
 from saltx import jacobian
 from saltx.log import Timer
+from saltx.trace import tracer
 
 log = logging.getLogger(__name__)
 
@@ -140,9 +141,6 @@ class NonLinearProblem:
 
         gt = self.gt
         ka = self.ka
-
-        # invperm has a real and an imaginary part
-        invp = self.invperm
 
         # gammak = lambda k: gt / (k - ka + 1j * gt)
         # dgammak_dk = lambda k: -gt / (k - ka + 1j * gt) ** 2
@@ -575,7 +573,8 @@ class NonLinearProblem:
         try:
             return self._cur_forms[nmodes]
         except KeyError:
-            cur_forms = self._create_newton_forms(nmodes)
+            with tracer.span("get_forms", nmodes=nmodes):
+                cur_forms = self._create_newton_forms(nmodes)
             self._cur_forms[nmodes] = cur_forms
             return cur_forms
 
@@ -635,32 +634,35 @@ class NonLinearProblem:
             log.debug(f"Returned cached matvec coll for {nmodes} modes")
         except KeyError:
             with Timer(log.warning, "creation of sparse dF_dvw matrix and vectors"):
-                mat_dF_dvw = create_matrix_block(a_form_array)
-                vec_F_petsc = create_vector_block(F_components)
-                vec_dF_dk_seq = [create_vector_block(dF_dk) for dF_dk in dF_dk_seq]
-                vec_dF_ds_seq = [create_vector_block(dF_ds) for dF_ds in dF_ds_seq]
-                matvec_coll = MatVecCollection(
-                    mat_dF_dvw=mat_dF_dvw,
-                    vec_F_petsc=vec_F_petsc,
-                    vec_dF_dk_seq=vec_dF_dk_seq,
-                    vec_dF_ds_seq=vec_dF_ds_seq,
-                )
+                with tracer.span("creating MatVecCollection", nmodes=nmodes):
+                    mat_dF_dvw = create_matrix_block(a_form_array)
+                    vec_F_petsc = create_vector_block(F_components)
+                    vec_dF_dk_seq = [create_vector_block(dF_dk) for dF_dk in dF_dk_seq]
+                    vec_dF_ds_seq = [create_vector_block(dF_ds) for dF_ds in dF_ds_seq]
+                    matvec_coll = MatVecCollection(
+                        mat_dF_dvw=mat_dF_dvw,
+                        vec_F_petsc=vec_F_petsc,
+                        vec_dF_dk_seq=vec_dF_dk_seq,
+                        vec_dF_ds_seq=vec_dF_ds_seq,
+                    )
 
                 self.matvec_coll_map[nmodes] = matvec_coll
 
-        with matvec_coll.vec_F_petsc.localForm() as F_local:
-            F_local.set(0.0)
-        fem.petsc.assemble_vector_block(
-            matvec_coll.vec_F_petsc, F_components, a_form_array, bcs=new_bcs
-        )
+        with tracer.span("assemble_vector_block F"):
+            with matvec_coll.vec_F_petsc.localForm() as F_local:
+                F_local.set(0.0)
+            fem.petsc.assemble_vector_block(
+                matvec_coll.vec_F_petsc, F_components, a_form_array, bcs=new_bcs
+            )
 
         # log.debug(f"norm F_petsc {F_petsc.norm(0)}")
         # S b = L.sub(0)
         # e^T b - 1 = L.sub(1)
 
-        f_vals = matvec_coll.vec_F_petsc.getArray()
-        L.setValues(range(2 * nmodes * n), f_vals.real)
-        L.setValues(range(2 * nmodes * n, 2 * nmodes * (n + 1)), np.asarray(etbm1s))
+        with tracer.span("update values of Vector L"):
+            f_vals = matvec_coll.vec_F_petsc.getArray()
+            L.setValues(range(2 * nmodes * n), f_vals.real)
+            L.setValues(range(2 * nmodes * n, 2 * nmodes * (n + 1)), np.asarray(etbm1s))
 
         log.info(f"current norm of F: {L.norm(0)}")
 
@@ -669,12 +671,15 @@ class NonLinearProblem:
         mat_dF_dvw = matvec_coll.mat_dF_dvw
         with Timer(log.debug, f"ass bilinear forms {mat_dF_dvw.getSize()=}"):
             mat_dF_dvw.zeroEntries()  # not sure if this is really needed
-            fem.petsc.assemble_matrix_block(
-                mat_dF_dvw,
-                a_form_array,
-                bcs=new_bcs,
-            )
-            mat_dF_dvw.assemble()
+
+            with Timer(log.debug, "  ass bilinear forms: matrix block"):
+                fem.petsc.assemble_matrix_block(
+                    mat_dF_dvw,
+                    a_form_array,
+                    bcs=new_bcs,
+                )
+            with Timer(log.debug, "  ass bilinear forms: .assemble"):
+                mat_dF_dvw.assemble()
 
         with Timer(log.debug, "ass linear forms"):
             vec_dk_seq = matvec_coll.vec_dF_dk_seq
