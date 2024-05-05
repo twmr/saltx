@@ -51,7 +51,7 @@ class Tracer:
         self._current_level -= 1
         assert self._current_level >= 0
 
-        log.info(f"#### Span took {t1-t0:.1f} s ({name})")
+        log.info(f"#### Span took {1e3*(t1-t0):.1f} ms ({name})")
 
 
 tracer = Tracer()
