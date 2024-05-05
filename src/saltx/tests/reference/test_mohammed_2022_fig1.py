@@ -243,6 +243,8 @@ def test_determine_first_threshold_contour_fig1(mohammed_system):
         )
         all_parametrized_modes[D1val.item()].append(new_nlm2)
 
+        # when cur_dof1/2 are updated here, the root solver might not converge
+
         return max([new_nlm2.k.imag, new_nlm1.k.imag])
 
     results = []  # (D1, D2)
@@ -254,6 +256,8 @@ def test_determine_first_threshold_contour_fig1(mohammed_system):
         d2_constant.value = D2val
 
         root_result = root(objfunc, prev_D1_result, tol=1e-8)
+        assert root_result.success
+
         prev_D1_result = root_result.x.item()
         results.append([prev_D1_result, D2val])
         if prev_D1_result < D2val:
