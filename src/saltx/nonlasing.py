@@ -58,6 +58,7 @@ class NonLasingLinearProblem:
         dielec: float | fem.Function,
         invperm: fem.Function | None,
         pump: float | fem.Function,
+        sigma_c: fem.Function | None,
         bcs,
         # TODO what is the type of ufl.ds?
         ds_obc: Any | None,
@@ -84,7 +85,7 @@ class NonLasingLinearProblem:
         self.pump = pump
 
         # dielectric loss of the cold (not-pumped) cavity
-        self.sigma_c = None
+        self.sigma_c = sigma_c
 
         self.bcs = bcs
         self.ds_obc = ds_obc

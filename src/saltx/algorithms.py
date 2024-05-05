@@ -22,6 +22,7 @@ from saltx.trace import tracer
 
 if typing.TYPE_CHECKING:
     from saltx.lasing import NonLinearProblem
+    from saltx.nonlasing import NonLasingLinearProblem
 
 log = logging.getLogger(__name__)
 
@@ -533,3 +534,89 @@ def constant_pump_algorithm(
         ]
         assert len(minfos) == active_modes
     raise RuntimeError("unreachable point reached")
+
+
+def newton(
+    nllp: NonLasingLinearProblem,
+    nlL,
+    nlA,
+    initial_x,
+    delta_x,
+    solver,
+    initial_dof_at_maximum: int,
+    bcs,
+    max_iterations: int = 25,
+    correction_norm_threshold: float = 1e-10,
+):
+    """Upon success, ``initial_x`` contains the mode and k."""
+    # TODO This newton algorithm is specific to the nonlasinglinerproblem. Try to
+    # generalize it and use it also in refine_mode
+
+    # TODO return a dataclass??
+
+    # FIXME make use of newtils
+
+    n = initial_x.getSize() - 1
+    i = 0
+    newton_steps = []
+    while i < max_iterations:
+        tstart = time.monotonic()
+        with tracer.span("assemble F vec and J matrix"):
+            nllp.assemble_F_and_J(nlL, nlA, initial_x, initial_dof_at_maximum)
+        nlL.ghostUpdate(
+            addv=PETSc.InsertMode.ADD_VALUES,
+            mode=PETSc.ScatterMode.REVERSE,
+        )
+        # Scale residual by -1
+        nlL.scale(-1)
+        nlL.ghostUpdate(
+            addv=PETSc.InsertMode.INSERT_VALUES,
+            mode=PETSc.ScatterMode.FORWARD,
+        )
+
+        with tracer.span("Solve KSP"):
+            solver.solve(nlL, delta_x)
+
+        relaxation_param = 1.0
+        initial_x += delta_x * relaxation_param
+
+        cur_k = initial_x.getValue(n)
+        Print(f"DELTA k: {delta_x.getValue(n)}")
+
+        i += 1
+
+        # Compute norm of update
+        correction_norm = delta_x.norm(0)
+
+        newton_steps.append((cur_k, correction_norm, time.monotonic() - tstart))
+
+        Print(f"----> Iteration {i}: Correction norm {correction_norm}")
+        if correction_norm < correction_norm_threshold:
+            break
+
+    if correction_norm > correction_norm_threshold:
+        raise RuntimeError("mode didn't converge")
+
+    # Print(f"Initial k: {mode.k} ...")
+    df = pd.DataFrame(newton_steps, columns=["k", "corrnorm", "dt"])
+    Print(df)
+
+    new_mode = initial_x.getArray().copy()[:-1]  # remove the k
+
+    dof_at_maximum = np.abs(new_mode).argmax()
+    val_maximum = new_mode[dof_at_maximum]
+    Print(
+        f" {cur_k.real:9f}{cur_k.imag:+9f} j {correction_norm:12g}   "
+        f"{val_maximum.real:2g} j {val_maximum.imag:2g}",
+    )
+
+    # fix norm and the phase
+    new_mode /= val_maximum
+    return NEVPNonLasingMode(
+        array=new_mode,
+        k=cur_k,
+        error=correction_norm,
+        bcs_name="default",
+        bcs=bcs,
+        dof_at_maximum=dof_at_maximum,
+    )
