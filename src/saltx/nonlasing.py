@@ -16,6 +16,7 @@ from ufl import dx, elem_mult, inner, nabla_grad
 
 from . import jacobian
 from .log import Timer
+from .trace import tracer
 
 log = logging.getLogger(__name__)
 
@@ -94,12 +95,12 @@ class NonLasingLinearProblem:
         self._mult = elem_mult if topo_dim > 1 else operator.mul
         self._curl = ufl.curl if topo_dim > 1 else nabla_grad
 
-        with Timer(log.debug, "Create fem forms"):
+        with tracer.span("Create fem forms"):
             self.create_forms()
 
         # initialize PETSc vectors to avoid repeated allocation in every iteration of
         # the Newton method.
-        with Timer(print, "Create initial matrix/vectors for J & F"):
+        with tracer.span("Create initial matrix/vectors for J & F"):
             self.vec_F_petsc = create_vector(self.form_Sb)
             self.mat_dF_du = create_matrix(self.form_dFdu)
             self.vec_dF_dk = create_vector(self.form_dFdk)
@@ -222,10 +223,9 @@ class NonLasingLinearProblem:
             Sb += 1j * k * N
             dFdk += 1j * N
 
-        with Timer(print, "fem.form(Sb)"):
+        with tracer.span("fem.form(Sb) + fem.form(dFdk)"):
             # Sb = -L + 1j * k * R + k**2 * M + 1j * k * N + k**2 * gammak * Q
             self.form_Sb = fem.form(Sb)
-        with Timer(print, "fem.form(dFdk)"):
             self.form_dFdk = fem.form(dFdk)
 
         # matrix:
