@@ -376,6 +376,7 @@ def test_eval_traj(system):
             gt=system.gt,
             dielec=system.dielec,
             invperm=system.invperm,
+            sigma_c=None,
             pump=D0_constant * system.pump_profile,
             bcs=bcs["full_dbc"],
             ds_obc=None,
