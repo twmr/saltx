@@ -9,8 +9,6 @@ Maxwell-Bloch theory".
 See https://doi.org/10.1063/5.0105963
 """
 import logging
-from collections import defaultdict, namedtuple
-from fractions import Fraction
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -18,14 +16,11 @@ import pytest
 import ufl
 from dolfinx import fem
 from petsc4py import PETSc
-from scipy.optimize import root
 from ufl import dx, inner, nabla_grad
 
 from saltx import algorithms, newtils
 from saltx.assemble import assemble_form
 from saltx.lasing import NonLinearProblem
-from saltx.mesh import create_combined_interval_mesh, create_dcells
-from saltx.nonlasing import NonLasingLinearProblem
 from saltx.tests.reference import ref_data_mohammed as rdm
 
 log = logging.getLogger(__name__)
@@ -35,83 +30,6 @@ Print = PETSc.Sys.Print
 # according to Fig S2(a) the roots of the intensity are at:
 D2D1_shutoff = 0.5067
 D2D1_turnon = 0.67
-
-
-@pytest.fixture()
-def system():
-    a = 1.0
-    n_cav = 3.0
-
-    _k = 0.71
-    _g = 0.2
-    D0ratio_ep = (_k - _g) / (_k + _g)
-    del _k, _g
-
-    ka = 2 * np.pi / a
-    gt = 0.1 * 2 * np.pi / a
-    # cold cavity conduction loss
-    sigma_inside_cavity = 0.5 * ka
-
-    # thickness = Length of the cavities
-    t = 5 * a / n_cav  # note that a/n_cav is the lambda inside cavity
-    d = 0.2174 * a  # gap between cavities
-    domains = [
-        (None, Fraction(t), 100),
-        (None, Fraction(d), 10),
-        (None, Fraction(t), 100),
-    ]
-    xstart = Fraction("0.0")
-    msh = create_combined_interval_mesh(xstart, domains)
-    dcells = create_dcells(msh, xstart, domains)
-
-    V_DG0 = fem.functionspace(msh, ("DG", 0))
-    dielec = fem.Function(V_DG0)
-    sigma_c = fem.Function(V_DG0)
-    invperm = fem.Function(V_DG0)
-    pump_left = fem.Function(V_DG0)
-    pump_right = fem.Function(V_DG0)
-
-    def cset(func, cells, value):
-        func.x.array[cells] = np.full_like(
-            cells,
-            value,
-            dtype=PETSc.ScalarType,
-        )
-
-    cells = dcells[0]
-    cset(dielec, cells, n_cav**2)
-    cset(sigma_c, cells, sigma_inside_cavity)
-    cset(invperm, cells, 1.0)
-    cset(pump_left, cells, 1.0)
-    cset(pump_right, cells, 0.0)
-    cells = dcells[1]
-    cset(dielec, cells, 1.0)
-    cset(sigma_c, cells, 0.0)
-    cset(invperm, cells, 1.0)
-    cset(pump_left, cells, 0.0)
-    cset(pump_right, cells, 0.0)
-    cells = dcells[2]
-    cset(dielec, cells, n_cav**2)
-    cset(sigma_c, cells, sigma_inside_cavity)
-    cset(invperm, cells, 1.0)
-    cset(pump_left, cells, 0.0)
-    cset(pump_right, cells, 1.0)
-
-    radius = 0.5 * gt
-    vscale = 0.5 * gt / radius
-    rg_params = (ka, radius, vscale)
-    del radius, vscale
-
-    V = fem.functionspace(msh, ("Lagrange", 3))
-
-    n = V.dofmap.index_map.size_global
-    bcs = []
-
-    evaluator = algorithms.Evaluator(V, msh, np.asarray([0, 2 * t + d]))
-    fine_evaluator = algorithms.Evaluator(V, msh, np.linspace(0, 2 * t + d, 512))
-
-    fixture_locals = locals()
-    return namedtuple("System", list(fixture_locals.keys()))(**fixture_locals)
 
 
 def real_const(V, real_value: float) -> fem.Constant:
@@ -241,7 +159,8 @@ def calculate_mode_and_intensity(
     return fac, intens, first_mode.s
 
 
-def test_single_mode_pump_trajectory_D1_0p85(system):
+def test_single_mode_pump_trajectory_D1_0p85(mohammed_system):
+    system = mohammed_system
     fixed_D1 = 0.85
     fac, intens, s = calculate_mode_and_intensity(system, fixed_D1, 0.2 * fixed_D1, 0.1)
 
@@ -292,7 +211,8 @@ def test_single_mode_pump_trajectory_D1_0p85(system):
     plt.show()
 
 
-def test_single_mode_pump_trajectory_D1_0p95(system):
+def test_single_mode_pump_trajectory_D1_0p95(mohammed_system):
+    system = mohammed_system
     fixed_D1 = 0.95
     fac, intens, s = calculate_mode_and_intensity(
         system, fixed_D1, 0.2 * fixed_D1, initial_s=0.5
@@ -399,7 +319,8 @@ def _refine_first_mode_and_calculate_nevp_again(
 
 
 @pytest.mark.skip(reason="Too slow for the CI")
-def test_eval_traj_D1_0p85(system):
+def test_eval_traj_D1_0p85(mohammed_system):
+    system = mohammed_system
     u = ufl.TrialFunction(system.V)
     v = ufl.TestFunction(system.V)
 
@@ -538,191 +459,4 @@ def test_eval_traj_D1_0p85(system):
     ax.set_xlabel("Intens of THE first lasermode")
     ax.legend()
 
-    plt.show()
-
-
-def test_determine_first_threshold_contour_fig1(system):
-    # first set D2=0 and scan D1
-    # set D1=initialD1
-    # solve nevp at the D1,D2
-    # -> increase D1 and use newton
-    # until one eval is above real axis
-    u = ufl.TrialFunction(system.V)
-    v = ufl.TestFunction(system.V)
-
-    initial_D1 = 0.6
-    d1_constant = real_const(system.V, initial_D1)
-    d2_constant = real_const(system.V, 0.0)
-
-    pump_expr = d1_constant * system.pump_left + d2_constant * system.pump_right
-
-    ds_obc = ufl.ds
-    L = assemble_form(
-        -inner(system.invperm * nabla_grad(u), nabla_grad(v)) * dx, system.bcs
-    )
-    M = assemble_form(system.dielec * inner(u, v) * dx, system.bcs, diag=0.0)
-    N = assemble_form(system.sigma_c * inner(u, v) * dx, system.bcs, diag=0.0)
-    R = assemble_form(inner(u, v) * ds_obc, system.bcs, diag=0.0)
-    Q = assemble_form(pump_expr * inner(u, v) * dx, system.bcs, diag=0.0)
-
-    nevp_inputs = algorithms.NEVPInputs(
-        ka=system.ka,
-        gt=system.gt,
-        rg_params=system.rg_params,
-        L=L,
-        M=M,
-        N=N,
-        Q=Q,
-        R=R,
-        bcs=system.bcs,
-    )
-
-    modes = algorithms.get_nevp_modes(nevp_inputs)
-    evals = np.asarray([mode.k for mode in modes])
-    assert evals.imag.max() < 0
-
-    nllp = NonLasingLinearProblem(
-        V=system.V,
-        ka=system.ka,
-        gt=system.gt,
-        dielec=system.dielec,
-        invperm=system.invperm,
-        sigma_c=system.sigma_c,
-        pump=pump_expr,
-        bcs=system.bcs,
-        ds_obc=ds_obc,
-    )
-
-    nlA = nllp.create_A(system.n)
-    nlL = nllp.create_L(system.n)
-    delta_x = nllp.create_dx(system.n)
-    initial_x1 = nllp.create_dx(system.n)  # for mode1
-    initial_x2 = nllp.create_dx(system.n)  # for mode2
-
-    solver = PETSc.KSP().create(system.msh.comm)
-    solver.setOperators(nlA)
-
-    PC = solver.getPC()
-    PC.setType("lu")
-    PC.setFactorSolverType("mumps")
-
-    ##############################################
-    m1 = modes[0]
-    cur_k1 = m1.k
-    cur_dof1 = m1.dof_at_maximum
-    initial_x1.setValues(range(system.n), m1.array)
-    initial_x1.setValue(system.n, m1.k)
-    assert initial_x1.getSize() == system.n + 1
-
-    m2 = modes[1]
-    cur_k2 = m2.k
-    cur_dof2 = m2.dof_at_maximum
-    initial_x2.setValues(range(system.n), m2.array)
-    initial_x2.setValue(system.n, m2.k)
-    assert initial_x2.getSize() == system.n + 1
-
-    D1_range = np.linspace(initial_D1, 0.80, 20)
-    all_parametrized_modes = defaultdict(list)
-    vals = []
-    for _Di, D1val in enumerate(D1_range):
-        log.info(f" {D1val=} ".center(80, "#"))
-
-        if False:
-            nllp._demo_check_solutions(initial_x1)
-            nllp._demo_check_solutions(initial_x2)
-
-        d1_constant.value = D1val
-
-        # FIXME mention previous pump step
-        log.error(f"Starting newton algorithm for mode1 @ k = {cur_k1}")
-        new_nlm1 = algorithms.newton(
-            nllp, nlL, nlA, initial_x1, delta_x, solver, cur_dof1, m1.bcs
-        )
-        all_parametrized_modes[D1val].append(new_nlm1)
-
-        log.error(f"Starting newton algorithm for mode2 @ k = {cur_k2}")
-        new_nlm2 = algorithms.newton(
-            nllp, nlL, nlA, initial_x2, delta_x, solver, cur_dof2, m2.bcs
-        )
-        all_parametrized_modes[D1val].append(new_nlm2)
-
-        cur_dof1 = new_nlm1.dof_at_maximum
-        cur_dof2 = new_nlm2.dof_at_maximum
-        cur_k1 = new_nlm1.k
-        cur_k2 = new_nlm2.k
-        vals.append(np.array([D1val, cur_k1, cur_k2]))
-
-        if cur_k1.imag > 0:
-            log.info("mode1.k above real axis")
-            break
-        if cur_k2.imag > 0:
-            log.info("mode2.k above real axis")
-            break
-
-        # use the current mode as an initial guess for the mode at the next D0
-        # -> we keep initial_x as is.
-
-    fig, axes = plt.subplots(nrows=2, sharex=True)
-
-    k1 = np.asarray([k1 for _, k1, _ in vals])
-    k2 = np.asarray([k2 for _, _, k2 in vals])
-    D1 = np.asarray([D1val for D1val, _, _ in vals]).real
-    norm = plt.Normalize(D1.min(), D1.max())
-
-    sc1 = axes[0].scatter(k1.real, k1.imag, c=D1, norm=norm)
-    axes[1].scatter(k2.real, k2.imag, c=D1, norm=norm)
-
-    axes[0].grid(True)
-    axes[1].grid(True)
-    fig.colorbar(sc1, ax=axes)
-    plt.show()
-
-    ########################
-    # find the first threshold when D2=0.0
-    # then track the threshold-mode for increasing D2
-
-    def objfunc(D1val):
-        d1_constant.value = D1val
-        log.error(f"objfunc: {D1val=}")
-
-        new_nlm1 = algorithms.newton(
-            nllp, nlL, nlA, initial_x1, delta_x, solver, cur_dof1, m1.bcs
-        )
-        all_parametrized_modes[D1val.item()].append(new_nlm1)
-
-        new_nlm2 = algorithms.newton(
-            nllp, nlL, nlA, initial_x2, delta_x, solver, cur_dof2, m2.bcs
-        )
-        all_parametrized_modes[D1val.item()].append(new_nlm2)
-
-        return max([new_nlm2.k.imag, new_nlm1.k.imag])
-
-    results = []  # (D1, D2)
-    D2range = np.linspace(0.0, 0.4, 12)
-    D2range = np.linspace(0.0, 0.8, 40)
-    prev_D1_result = D1val
-
-    for D2val in D2range:
-        d2_constant.value = D2val
-
-        root_result = root(objfunc, prev_D1_result, tol=1e-8)
-        prev_D1_result = root_result.x.item()
-        results.append([prev_D1_result, D2val])
-        if prev_D1_result < D2val:
-            break
-
-    fig, ax = plt.subplots()
-
-    data = np.asarray(results)
-    ax.plot(data[:, 0], data[:, 1], "x")
-
-    # 45deg line
-    ax.plot([0, 1], [0, 1], "-")
-
-    # TODO plot data from paper
-
-    ax.grid(True)
-    ax.set_aspect("equal")
-    ax.set_xlabel("D1")
-    ax.set_ylabel("D2")
     plt.show()
