@@ -298,7 +298,16 @@ def test_intensity_vs_pump_esterhazy(system):
         else:
             # use the previous modes as an initial-guess for the newton solver
             modes = [
-                algorithms.newton(nllp, nlL, nlA, initial_x, delta_x, solver, mode)
+                algorithms.newton(
+                    nllp,
+                    nlL,
+                    nlA,
+                    initial_x,
+                    delta_x,
+                    solver,
+                    mode.dof_at_maximum,
+                    mode.bcs,
+                )
                 for mode, initial_x in zip(modes, initial_xs)
             ]
         evals = np.asarray([mode.k for mode in modes])
