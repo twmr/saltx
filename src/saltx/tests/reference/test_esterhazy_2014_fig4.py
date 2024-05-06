@@ -14,7 +14,6 @@ from collections import defaultdict, namedtuple
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import pytest
 import ufl
 from dolfinx import fem, mesh
@@ -25,7 +24,6 @@ from ufl import dx, inner, nabla_grad
 from saltx import algorithms, newtils
 from saltx.assemble import assemble_form
 from saltx.lasing import NonLinearProblem
-from saltx.log import Timer
 from saltx.nonlasing import NonLasingLinearProblem
 from saltx.plot import plot_ellipse
 
@@ -77,86 +75,6 @@ def system():
 
     fixture_locals = locals()
     return namedtuple("System", list(fixture_locals.keys()))(**fixture_locals)
-
-
-def nonlasing_newton(
-    nllp,
-    nlL,
-    nlA,
-    initial_x,
-    delta_x,
-    solver,
-    mode,
-    max_iterations=25,
-    correction_norm_threshold=1e-10,
-):
-    """Upon success, ``initial_x`` contains the mode and k."""
-    # TODO return a dataclass??
-    # TODO clean this up and move it algorithms.py
-
-    n = initial_x.getSize() - 1
-    i = 0
-    newton_steps = []
-    while i < max_iterations:
-        tstart = time.monotonic()
-        with Timer(log.info, "assemble F vec and J matrix"):
-            nllp.assemble_F_and_J(nlL, nlA, initial_x, mode.dof_at_maximum)
-        nlL.ghostUpdate(
-            addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE
-        )
-        # Scale residual by -1
-        nlL.scale(-1)
-        nlL.ghostUpdate(
-            addv=PETSc.InsertMode.INSERT_VALUES,
-            mode=PETSc.ScatterMode.FORWARD,
-        )
-
-        with Timer(Print, "Solve KSP"):
-            solver.solve(nlL, delta_x)
-
-        relaxation_param = 1.0
-        initial_x += delta_x * relaxation_param
-
-        cur_k = initial_x.getValue(n)
-        Print(f"DELTA k: {delta_x.getValue(n)}")
-
-        i += 1
-
-        # Compute norm of update
-        correction_norm = delta_x.norm(0)
-
-        newton_steps.append((cur_k, correction_norm, time.monotonic() - tstart))
-
-        Print(f"----> Iteration {i}: Correction norm {correction_norm}")
-        if correction_norm < correction_norm_threshold:
-            break
-
-    if correction_norm > correction_norm_threshold:
-        raise RuntimeError(f"mode at {mode.k} didn't converge")
-
-    Print(f"Initial k: {mode.k} ...")
-    df = pd.DataFrame(newton_steps, columns=["k", "corrnorm", "dt"])
-    Print(df)
-
-    new_mode = initial_x.getArray().copy()[:-1]  # remove the k
-
-    dof_at_maximum = np.abs(new_mode).argmax()
-    val_maximum = new_mode[np.abs(new_mode).argmax()]
-    Print(
-        f" {cur_k.real:9f}{cur_k.imag:+9f} j {correction_norm:12g}   "
-        f"{val_maximum.real:2g} j {val_maximum.imag:2g}"
-    )
-
-    # fix norm and the phase
-    new_mode /= val_maximum
-    return algorithms.NEVPNonLasingMode(
-        array=new_mode,
-        k=cur_k,
-        error=correction_norm,
-        bcs_name="default",
-        bcs=mode.bcs,
-        dof_at_maximum=dof_at_maximum,
-    )
 
 
 def test_evaltraj(system):
@@ -239,8 +157,15 @@ def test_evaltraj(system):
             D0_constant.value = D0
 
             all_parametrized_modes[D0].append(
-                nonlasing_newton(
-                    nllp, nlL, nlA, initial_x, delta_x, solver, initial_mode
+                algorithms.newton(
+                    nllp,
+                    nlL,
+                    nlA,
+                    initial_x,
+                    delta_x,
+                    solver,
+                    initial_mode.dof_at_maximum,
+                    initial_mode.bcs,
                 )
             )
             # In this loop we use the current mode as an initial guess for the mode at
@@ -373,7 +298,7 @@ def test_intensity_vs_pump_esterhazy(system):
         else:
             # use the previous modes as an initial-guess for the newton solver
             modes = [
-                nonlasing_newton(nllp, nlL, nlA, initial_x, delta_x, solver, mode)
+                algorithms.newton(nllp, nlL, nlA, initial_x, delta_x, solver, mode)
                 for mode, initial_x in zip(modes, initial_xs)
             ]
         evals = np.asarray([mode.k for mode in modes])
