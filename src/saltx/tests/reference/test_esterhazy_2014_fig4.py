@@ -121,10 +121,10 @@ def test_evaltraj(system):
         ds_obc=ufl.ds,
     )
 
-    nlA = nllp.create_A(system.n)
-    nlL = nllp.create_L(system.n)
-    delta_x = nllp.create_dx(system.n)
-    initial_x = nllp.create_dx(system.n)
+    nlA = nllp.create_A()
+    nlL = nllp.create_L()
+    delta_x = nllp.create_dx()
+    initial_x = nllp.create_dx()
 
     solver = PETSc.KSP().create(system.msh.comm)
     solver.setOperators(nlA)
@@ -264,10 +264,10 @@ def test_intensity_vs_pump_esterhazy(system):
         ds_obc=system.ds_obc,
     )
 
-    nlA = nllp.create_A(system.n)
-    nlL = nllp.create_L(system.n)
-    delta_x = nllp.create_dx(system.n)
-    initial_xs = [nllp.create_dx(system.n) for _ in range(4)]
+    nlA = nllp.create_A()
+    nlL = nllp.create_L()
+    delta_x = nllp.create_dx()
+    initial_xs = [nllp.create_dx() for _ in range(4)]
 
     solver = PETSc.KSP().create(system.msh.comm)
     solver.setOperators(nlA)

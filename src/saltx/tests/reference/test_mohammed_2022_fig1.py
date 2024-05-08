@@ -141,11 +141,11 @@ def test_determine_first_threshold_contour_fig1(mohammed_system):
         ds_obc=ds_obc,
     )
 
-    nlA = nllp.create_A(system.n)
-    nlL = nllp.create_L(system.n)
-    delta_x = nllp.create_dx(system.n)
-    initial_x1 = nllp.create_dx(system.n)  # for mode1
-    initial_x2 = nllp.create_dx(system.n)  # for mode2
+    nlA = nllp.create_A()
+    nlL = nllp.create_L()
+    delta_x = nllp.create_dx()
+    initial_x1 = nllp.create_dx()  # for mode1
+    initial_x2 = nllp.create_dx()  # for mode2
 
     solver = PETSc.KSP().create(system.msh.comm)
     solver.setOperators(nlA)

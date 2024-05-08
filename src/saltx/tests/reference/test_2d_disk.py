@@ -386,10 +386,10 @@ def test_eval_traj(system):
             ds_obc=None,
         )
 
-        nlA = nllp.create_A(system.n)
-        nlL = nllp.create_L(system.n)
-        delta_x = nllp.create_dx(system.n)
-        initial_x = nllp.create_dx(system.n)
+        nlA = nllp.create_A()
+        nlL = nllp.create_L()
+        delta_x = nllp.create_dx()
+        initial_x = nllp.create_dx()
 
         solver = PETSc.KSP().create(system.msh.comm)
         solver.setOperators(nlA)

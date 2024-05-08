@@ -244,16 +244,16 @@ class NonLasingLinearProblem:
 
         self.form_dFdu = fem.form(dFdu)
 
-    def create_A(self, n_fem):
+    def create_A(self):
         A = PETSc.Mat().create(MPI.COMM_WORLD)
-        N = n_fem + 1
+        N = self.n + 1
         A.setSizes([N, N])
         A.setUp()
         return A
 
-    def create_L(self, n_fem):
-        return PETSc.Vec().createSeq(n_fem + 1)
+    def create_L(self):
+        return PETSc.Vec().createSeq(self.n + 1)
 
-    def create_dx(self, n_fem):
+    def create_dx(self):
         # n_fem (complex-valued) entries for b, 1 for k
-        return PETSc.Vec().createSeq(n_fem + 1)
+        return PETSc.Vec().createSeq(self.n + 1)
