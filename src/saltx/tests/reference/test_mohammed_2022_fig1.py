@@ -8,6 +8,7 @@ Maxwell-Bloch theory".
 
 See https://doi.org/10.1063/5.0105963
 """
+
 import logging
 from collections import defaultdict
 
@@ -15,11 +16,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import ufl
 from dolfinx import fem
-from petsc4py import PETSc
 from scipy.optimize import root
 from ufl import dx, inner, nabla_grad
 
-from saltx import algorithms
+from saltx import algorithms, nonlasing
 from saltx.assemble import assemble_form
 from saltx.nonlasing import NonLasingLinearProblem
 
@@ -141,33 +141,21 @@ def test_determine_first_threshold_contour_fig1(mohammed_system):
         ds_obc=ds_obc,
     )
 
-    nlA = nllp.create_A()
-    nlL = nllp.create_L()
-    delta_x = nllp.create_dx()
-    initial_x1 = nllp.create_dx()  # for mode1
-    initial_x2 = nllp.create_dx()  # for mode2
+    newton_operators = nonlasing.create_solver_and_matrices(nllp, nmodes=2)
 
-    solver = PETSc.KSP().create(system.msh.comm)
-    solver.setOperators(nlA)
-
-    PC = solver.getPC()
-    PC.setType("lu")
-    PC.setFactorSolverType("mumps")
+    def init_mode(mode, initial_x):
+        initial_x.setValues(range(system.n), mode.array)
+        initial_x.setValue(system.n, mode.k)
+        assert initial_x.getSize() == system.n + 1
+        return mode
 
     ##############################################
-    m1 = modes[0]
+    m1 = init_mode(modes[0], newton_operators.initial_x_seq[0])
     cur_k1 = m1.k
     cur_dof1 = m1.dof_at_maximum
-    initial_x1.setValues(range(system.n), m1.array)
-    initial_x1.setValue(system.n, m1.k)
-    assert initial_x1.getSize() == system.n + 1
-
-    m2 = modes[1]
+    m2 = init_mode(modes[1], newton_operators.initial_x_seq[1])
     cur_k2 = m2.k
     cur_dof2 = m2.dof_at_maximum
-    initial_x2.setValues(range(system.n), m2.array)
-    initial_x2.setValue(system.n, m2.k)
-    assert initial_x2.getSize() == system.n + 1
 
     D1_range = np.linspace(initial_D1, 0.80, 20)
     all_parametrized_modes = defaultdict(list)
@@ -176,21 +164,35 @@ def test_determine_first_threshold_contour_fig1(mohammed_system):
         log.info(f" {D1val=} ".center(80, "#"))
 
         if False:
-            nllp._demo_check_solutions(initial_x1)
-            nllp._demo_check_solutions(initial_x2)
+            nllp._demo_check_solutions(newton_operators.initial_x_seq[0])
+            nllp._demo_check_solutions(newton_operators.initial_x_seq[1])
 
         d1_constant.value = D1val
 
         # FIXME mention previous pump step
         log.error(f"Starting newton algorithm for mode1 @ k = {cur_k1}")
         new_nlm1 = algorithms.newton(
-            nllp, nlL, nlA, initial_x1, delta_x, solver, cur_dof1, m1.bcs
+            nllp,
+            newton_operators.L,
+            newton_operators.A,
+            newton_operators.initial_x_seq[0],
+            newton_operators.delta_x,
+            newton_operators.solver,
+            cur_dof1,
+            m1.bcs,
         )
         all_parametrized_modes[D1val].append(new_nlm1)
 
         log.error(f"Starting newton algorithm for mode2 @ k = {cur_k2}")
         new_nlm2 = algorithms.newton(
-            nllp, nlL, nlA, initial_x2, delta_x, solver, cur_dof2, m2.bcs
+            nllp,
+            newton_operators.L,
+            newton_operators.A,
+            newton_operators.initial_x_seq[1],
+            newton_operators.delta_x,
+            newton_operators.solver,
+            cur_dof2,
+            m2.bcs,
         )
         all_parametrized_modes[D1val].append(new_nlm2)
 
@@ -234,12 +236,26 @@ def test_determine_first_threshold_contour_fig1(mohammed_system):
         log.error(f"objfunc: {D1val=}")
 
         new_nlm1 = algorithms.newton(
-            nllp, nlL, nlA, initial_x1, delta_x, solver, cur_dof1, m1.bcs
+            nllp,
+            newton_operators.L,
+            newton_operators.A,
+            newton_operators.initial_x_seq[0],
+            newton_operators.delta_x,
+            newton_operators.solver,
+            cur_dof1,
+            m1.bcs,
         )
         all_parametrized_modes[D1val.item()].append(new_nlm1)
 
         new_nlm2 = algorithms.newton(
-            nllp, nlL, nlA, initial_x2, delta_x, solver, cur_dof2, m2.bcs
+            nllp,
+            newton_operators.L,
+            newton_operators.A,
+            newton_operators.initial_x_seq[1],
+            newton_operators.delta_x,
+            newton_operators.solver,
+            cur_dof2,
+            m2.bcs,
         )
         all_parametrized_modes[D1val.item()].append(new_nlm2)
 

@@ -3,6 +3,7 @@
 # This file is part of saltx (https://github.com/twmr/saltx)
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
+import dataclasses
 import logging
 import operator
 from typing import Any
@@ -257,3 +258,32 @@ class NonLasingLinearProblem:
     def create_dx(self):
         # n_fem (complex-valued) entries for b, 1 for k
         return PETSc.Vec().createSeq(self.n + 1)
+
+
+@dataclasses.dataclass
+class NonLasingNewtonMatricesAndSolver:
+    A: PETSc.Mat
+    L: PETSc.Vec
+    delta_x: PETSc.Vec
+    initial_x_seq: list[PETSc.Vec]
+    solver: PETSc.KSP
+
+
+def create_solver_and_matrices(
+    nllp: NonLasingLinearProblem, nmodes: int = 1
+) -> NonLasingNewtonMatricesAndSolver:
+    nlA = nllp.create_A()
+    nlL = nllp.create_L()
+    delta_x = nllp.create_dx()
+    initial_x_seq = [nllp.create_dx() for _ in range(nmodes)]
+
+    solver = PETSc.KSP().create(nllp.V.mesh.comm)
+    solver.setOperators(nlA)
+
+    PC = solver.getPC()
+    PC.setType("lu")
+    PC.setFactorSolverType("mumps")
+
+    return NonLasingNewtonMatricesAndSolver(
+        A=nlA, L=nlL, delta_x=delta_x, initial_x_seq=initial_x_seq, solver=solver
+    )
