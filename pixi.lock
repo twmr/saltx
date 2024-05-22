@@ -1,8 +1,10 @@
-version: 4
+version: 5
 environments:
   default:
     channels:
     - url: https://conda.anaconda.org/conda-forge/
+    indexes:
+    - https://pypi.org/simple
     packages:
       linux-64:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/_libgcc_mutex-0.1-conda_forge.tar.bz2
@@ -198,6 +200,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/pytz-2024.1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/qt-main-5.15.8-hc9dc06e_21.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/readline-8.2-h8228510_1.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/ruff-0.4.4-py312h5715c7c_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/scalapack-2.2.0-hd931219_1.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/linux-64/scipy-1.13.0-py312heda63a1_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/scotch-7.0.4-h23d43cc_1.conda
@@ -3714,11 +3717,30 @@ packages:
   license_family: GPL
   size: 281456
   timestamp: 1679532220005
+- kind: conda
+  name: ruff
+  version: 0.4.4
+  build: py312h5715c7c_0
+  subdir: linux-64
+  url: https://conda.anaconda.org/conda-forge/linux-64/ruff-0.4.4-py312h5715c7c_0.conda
+  sha256: 23795ee023595be9e5c52736b280de4a2adb2082993615ee05e71e563628b266
+  md5: b217a3a08f3cc3275822367a0a9abb54
+  depends:
+  - libgcc-ng >=12
+  - libstdcxx-ng >=12
+  - python >=3.12,<3.13.0a0
+  - python_abi 3.12.* *_cp312
+  license: MIT
+  license_family: MIT
+  purls:
+  - pkg:pypi/ruff
+  size: 6280363
+  timestamp: 1715289943071
 - kind: pypi
   name: saltx
   version: 0.1.0
   path: .
-  sha256: 8392dbc7fe46b02f3c392b83a8cdcd94c9b12bf99f98bd50fc19d97860f97aae
+  sha256: 89f6f652bd6f0085bc995fb8e770f5929b3a6f8f58ec3f67254711b9772961e8
   requires_python: '>=3.10'
   editable: true
 - kind: conda

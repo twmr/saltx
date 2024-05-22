@@ -65,3 +65,4 @@ scipy = ">=1.13.0,<1.14"
 petsc = { version = "==3.20.6", build = "complex_*" }
 python = "3.12.*"
 ipython = ">=8.22.2,<8.23"
+ruff = ">=0.4.4,<0.5"
