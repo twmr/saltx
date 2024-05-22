@@ -10,6 +10,7 @@ from typing import Any
 
 import ufl
 from dolfinx import fem
+from dolfinx.fem import dirichletbc
 from dolfinx.fem.petsc import create_matrix, create_vector
 from mpi4py import MPI
 from petsc4py import PETSc
@@ -261,11 +262,23 @@ class NonLasingLinearProblem:
 
 
 @dataclasses.dataclass
+class NonLasingInitialX:
+    vec: PETSc.Vec
+    dof_at_maximum: int
+    bcs: list[dirichletbc]
+
+    @property
+    def k(self) -> complex:
+        n = self.vec.getSize() - 1
+        return self.vec.getValue(n)
+
+
+@dataclasses.dataclass
 class NonLasingNewtonMatricesAndSolver:
     A: PETSc.Mat
     L: PETSc.Vec
     delta_x: PETSc.Vec
-    initial_x_seq: list[PETSc.Vec]
+    initial_x_seq: list[NonLasingInitialX]
     solver: PETSc.KSP
 
 
@@ -275,11 +288,23 @@ def create_solver_and_matrices(
     nlA = nllp.create_A()
     nlL = nllp.create_L()
     delta_x = nllp.create_dx()
-    initial_x_seq = [nllp.create_dx() for _ in range(nmodes)]
+    initial_x_seq = [
+        # dof_at_maximum has to be updated by the caller of the newton function.
+        NonLasingInitialX(nllp.create_dx(), dof_at_maximum=0, bcs=nllp.bcs)
+        for _ in range(nmodes)
+    ]
 
     solver = PETSc.KSP().create(nllp.V.mesh.comm)
     solver.setOperators(nlA)
 
+    if False:
+
+        def monitor(ksp, its, rnorm):
+            print(f"{its}, {rnorm}")
+
+        solver.setMonitor(monitor)
+
+    # Preconditioner (this has a huge impact on performance!!!)
     PC = solver.getPC()
     PC.setType("lu")
     PC.setFactorSolverType("mumps")

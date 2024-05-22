@@ -21,7 +21,7 @@ from ufl import dx, inner, nabla_grad
 
 from saltx import algorithms, nonlasing
 from saltx.assemble import assemble_form
-from saltx.nonlasing import NonLasingLinearProblem
+from saltx.nonlasing import NonLasingInitialX, NonLasingLinearProblem
 
 log = logging.getLogger(__name__)
 
@@ -143,19 +143,35 @@ def test_determine_first_threshold_contour_fig1(mohammed_system):
 
     newton_operators = nonlasing.create_solver_and_matrices(nllp, nmodes=2)
 
-    def init_mode(mode, initial_x):
-        initial_x.setValues(range(system.n), mode.array)
-        initial_x.setValue(system.n, mode.k)
-        assert initial_x.getSize() == system.n + 1
-        return mode
+    def update_dofmax_of_initial_mode(nlm, init_x: NonLasingInitialX) -> None:
+        init_x.dof_at_maximum = nlm.dof_at_maximum
 
-    ##############################################
-    m1 = init_mode(modes[0], newton_operators.initial_x_seq[0])
-    cur_k1 = m1.k
-    cur_dof1 = m1.dof_at_maximum
-    m2 = init_mode(modes[1], newton_operators.initial_x_seq[1])
-    cur_k2 = m2.k
-    cur_dof2 = m2.dof_at_maximum
+    def init_mode(mode_idx: int) -> NonLasingInitialX:
+        init_x: NonLasingInitialX = newton_operators.initial_x_seq[mode_idx]
+        mode = modes[mode_idx]
+
+        init_x.vec.setValues(range(system.n), mode.array)
+        init_x.vec.setValue(system.n, mode.k)
+        assert init_x.vec.getSize() == system.n + 1
+        update_dofmax_of_initial_mode(mode, init_x)
+        return init_x
+
+    def run_newton(mode_idx: int):
+        init_x: NonLasingInitialX = newton_operators.initial_x_seq[mode_idx]
+        return algorithms.newton(
+            nllp,
+            newton_operators.L,
+            newton_operators.A,
+            init_x.vec,
+            newton_operators.delta_x,
+            newton_operators.solver,
+            init_x.dof_at_maximum,
+            init_x.bcs,
+        )
+
+    # init the initial-guess of the newton solver data from the eigen modes
+    init_m1 = init_mode(0)
+    init_m2 = init_mode(1)
 
     D1_range = np.linspace(initial_D1, 0.80, 20)
     all_parametrized_modes = defaultdict(list)
@@ -164,53 +180,33 @@ def test_determine_first_threshold_contour_fig1(mohammed_system):
         log.info(f" {D1val=} ".center(80, "#"))
 
         if False:
-            nllp._demo_check_solutions(newton_operators.initial_x_seq[0])
-            nllp._demo_check_solutions(newton_operators.initial_x_seq[1])
+            nllp._demo_check_solutions(init_m1.vec)
+            nllp._demo_check_solutions(init_m2.vec)
 
         d1_constant.value = D1val
 
         # FIXME mention previous pump step
-        log.error(f"Starting newton algorithm for mode1 @ k = {cur_k1}")
-        new_nlm1 = algorithms.newton(
-            nllp,
-            newton_operators.L,
-            newton_operators.A,
-            newton_operators.initial_x_seq[0],
-            newton_operators.delta_x,
-            newton_operators.solver,
-            cur_dof1,
-            m1.bcs,
-        )
+        log.error(f"Starting newton algorithm for mode1 @ k = {init_m1.k}")
+        new_nlm1 = run_newton(0)
+        update_dofmax_of_initial_mode(new_nlm1, init_m1)
         all_parametrized_modes[D1val].append(new_nlm1)
 
-        log.error(f"Starting newton algorithm for mode2 @ k = {cur_k2}")
-        new_nlm2 = algorithms.newton(
-            nllp,
-            newton_operators.L,
-            newton_operators.A,
-            newton_operators.initial_x_seq[1],
-            newton_operators.delta_x,
-            newton_operators.solver,
-            cur_dof2,
-            m2.bcs,
-        )
+        log.error(f"Starting newton algorithm for mode2 @ k = {init_m2.k}")
+        new_nlm2 = run_newton(1)
+        update_dofmax_of_initial_mode(new_nlm2, init_m2)
         all_parametrized_modes[D1val].append(new_nlm2)
 
-        cur_dof1 = new_nlm1.dof_at_maximum
-        cur_dof2 = new_nlm2.dof_at_maximum
-        cur_k1 = new_nlm1.k
-        cur_k2 = new_nlm2.k
-        vals.append(np.array([D1val, cur_k1, cur_k2]))
+        vals.append(np.array([D1val, init_m1.k, init_m2.k]))
 
-        if cur_k1.imag > 0:
+        if init_m1.k.imag > 0:
             log.info("mode1.k above real axis")
             break
-        if cur_k2.imag > 0:
+        if init_m2.k.imag > 0:
             log.info("mode2.k above real axis")
             break
 
         # use the current mode as an initial guess for the mode at the next D0
-        # -> we keep initial_x as is.
+        # -> For that we keep init_m1 and init_m2 as is.
 
     fig, axes = plt.subplots(nrows=2, sharex=True)
 
@@ -235,31 +231,15 @@ def test_determine_first_threshold_contour_fig1(mohammed_system):
         d1_constant.value = D1val
         log.error(f"objfunc: {D1val=}")
 
-        new_nlm1 = algorithms.newton(
-            nllp,
-            newton_operators.L,
-            newton_operators.A,
-            newton_operators.initial_x_seq[0],
-            newton_operators.delta_x,
-            newton_operators.solver,
-            cur_dof1,
-            m1.bcs,
-        )
+        # for a root-solver run, the dof_at_maximum must be fixed. Therefore we don't
+        # call apply_results_from_newton_to_initial_mode here. Otherwise, the root
+        # solver might not converge.
+
+        new_nlm1 = run_newton(0)
         all_parametrized_modes[D1val.item()].append(new_nlm1)
 
-        new_nlm2 = algorithms.newton(
-            nllp,
-            newton_operators.L,
-            newton_operators.A,
-            newton_operators.initial_x_seq[1],
-            newton_operators.delta_x,
-            newton_operators.solver,
-            cur_dof2,
-            m2.bcs,
-        )
+        new_nlm2 = run_newton(1)
         all_parametrized_modes[D1val.item()].append(new_nlm2)
-
-        # when cur_dof1/2 are updated here, the root solver might not converge
 
         return max([new_nlm2.k.imag, new_nlm1.k.imag])
 

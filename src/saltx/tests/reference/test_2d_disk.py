@@ -53,7 +53,7 @@ from mpi4py import MPI
 from petsc4py import PETSc
 from ufl import curl, dx, elem_mult, inner
 
-from saltx import algorithms, newtils
+from saltx import algorithms, newtils, nonlasing
 from saltx.assemble import assemble_form
 from saltx.lasing import NonLinearProblem
 from saltx.nonlasing import NonLasingLinearProblem
@@ -386,56 +386,48 @@ def test_eval_traj(system):
             ds_obc=None,
         )
 
-        nlA = nllp.create_A()
-        nlL = nllp.create_L()
-        delta_x = nllp.create_dx()
-        initial_x = nllp.create_dx()
+        nonlasing_newton_operators = nonlasing.create_solver_and_matrices(
+            nllp, nmodes=1
+        )
+        initial_x: nonlasing.NonLasingInitialX = (
+            nonlasing_newton_operators.initial_x_seq[0]
+        )
 
-        solver = PETSc.KSP().create(system.msh.comm)
-        solver.setOperators(nlA)
+        def update_dofmax_of_initial_x(nlm) -> None:
+            initial_x.dof_at_maximum = nlm.dof_at_maximum
 
-        if False:
-
-            def monitor(ksp, its, rnorm):
-                print(f"{its}, {rnorm}")
-
-            solver.setMonitor(monitor)
-
-        # Preconditioner (this has a huge impact on performance!!!)
-        PC = solver.getPC()
-        PC.setType("lu")
-        PC.setFactorSolverType("mumps")
+        def update_initial_x_with_data_from_mode(mode):
+            initial_x.vec.setValues(range(system.n), mode.array)
+            initial_x.vec.setValue(system.n, mode.k)
+            assert initial_x.vec.getSize() == system.n + 1
+            update_dofmax_of_initial_x(mode)
 
     vals = []
 
     t0 = time.monotonic()
     for midx in [10]:  # range(7,13):
         if use_newton:
-            initial_mode = modes[midx]
-            dof_at_maximum = initial_mode.dof_at_maximum
-
-            initial_x.setValues(range(system.n), initial_mode.array)
-            initial_x.setValue(system.n, initial_mode.k)
-            assert initial_x.getSize() == system.n + 1
+            update_initial_x_with_data_from_mode(modes[midx])
 
         for D0 in D0range:
             log.info(f" {D0=} ".center(80, "#"))
             if use_newton:
-                log.error(f"Starting newton algorithm for mode @ k = {initial_mode.k}")
+                log.error(f"Starting newton algorithm for mode @ k = {initial_x.k}")
                 D0_constant.value = D0
 
                 new_nllm = algorithms.newton(
                     nllp,
-                    nlL,
-                    nlA,
-                    initial_x,
-                    delta_x,
-                    solver,
-                    dof_at_maximum,
-                    nllp.bcs,
+                    nonlasing_newton_operators.L,
+                    nonlasing_newton_operators.A,
+                    initial_x.vec,
+                    nonlasing_newton_operators.delta_x,
+                    nonlasing_newton_operators.solver,
+                    initial_x.dof_at_maximum,
+                    initial_x.bcs,
                     max_iterations=20,
                 )
-                dof_at_maximum = new_nllm.dof_at_maximum
+
+                update_dofmax_of_initial_x(new_nllm)
 
                 # use the current mode as an initial guess for the mode at the next D0
                 # -> we keep initial_x as is.
