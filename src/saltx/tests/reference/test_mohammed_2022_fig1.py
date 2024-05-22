@@ -185,7 +185,6 @@ def test_determine_first_threshold_contour_fig1(mohammed_system):
 
         d1_constant.value = D1val
 
-        # FIXME mention previous pump step
         log.error(f"Starting newton algorithm for mode1 @ k = {init_m1.k}")
         new_nlm1 = run_newton(0)
         update_dofmax_of_initial_mode(new_nlm1, init_m1)
@@ -236,10 +235,8 @@ def test_determine_first_threshold_contour_fig1(mohammed_system):
         # solver might not converge.
 
         new_nlm1 = run_newton(0)
-        all_parametrized_modes[D1val.item()].append(new_nlm1)
-
         new_nlm2 = run_newton(1)
-        all_parametrized_modes[D1val.item()].append(new_nlm2)
+        all_parametrized_modes[D1val.item()].extend([new_nlm1, new_nlm2])
 
         return max([new_nlm2.k.imag, new_nlm1.k.imag])
 
