@@ -35,6 +35,8 @@ select = [
     # Pycodestyle
     "E",
     "W",
+    # pyupgrade
+    "UP",
     # isort
     "I001",
     "RET",

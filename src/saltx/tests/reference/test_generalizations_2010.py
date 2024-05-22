@@ -543,7 +543,7 @@ def test_intensity_vs_pump(system):
         if False:
             # The abs evals.real condition can be used to speed up the algorithm
             modeselectors = np.argwhere(
-                (evals.imag > 0)  # & (abs(evals.real - 15.4) < 0.4)
+                evals.imag > 0  # & (abs(evals.real - 15.4) < 0.4)
             ).flatten()
 
             # find single laser mode:
