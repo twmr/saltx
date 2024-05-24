@@ -24,9 +24,9 @@ from mpi4py import MPI
 from petsc4py import PETSc
 from ufl import dx, inner, nabla_grad
 
-from saltx import algorithms
+from saltx import algorithms, nonlasing
 from saltx.assemble import assemble_form
-from saltx.nonlasing import NonLasingLinearProblem
+from saltx.nonlasing import NonLasingInitialX, NonLasingLinearProblem
 from saltx.plot import plot_ellipse
 
 log = logging.getLogger(__name__)
@@ -138,51 +138,51 @@ def test_evaltraj(system, infra):
         ds_obc=ufl.ds,
     )
 
-    nlA = nllp.create_A()
-    nlL = nllp.create_L()
-    delta_x = nllp.create_dx()
-    initial_x = nllp.create_dx()
+    nl_newton_operators = nonlasing.create_solver_and_matrices(nllp, nmodes=len(modes))
 
-    solver = PETSc.KSP().create(system.msh.comm)
-    solver.setOperators(nlA)
+    def update_dofmax_of_initial_mode(nlm, init_x: NonLasingInitialX) -> None:
+        init_x.dof_at_maximum = nlm.dof_at_maximum
 
-    PC = solver.getPC()
-    PC.setType("lu")
-    PC.setFactorSolverType("mumps")
+    def init_mode(mode_idx: int) -> NonLasingInitialX:
+        init_x: NonLasingInitialX = nl_newton_operators.initial_x_seq[mode_idx]
+        mode = modes[mode_idx]
+
+        init_x.vec.setValues(range(system.n), mode.array)
+        init_x.vec.setValue(system.n, mode.k)
+        assert init_x.vec.getSize() == system.n + 1
+        update_dofmax_of_initial_mode(mode, init_x)
+        return init_x
 
     if False:
-        initial_mode = modes[0]
-        initial_x.setValues(range(system.n), initial_mode.array)
-        initial_x.setValue(system.n, initial_mode.k)
-        assert initial_x.getSize() == system.n + 1
-
-        nllp.assemble_F_and_J(nlL, nlA, initial_x, initial_mode.dof_at_maximum)
+        initial_x = init_mode(0)
+        nllp.assemble_F_and_J(
+            nl_newton_operators.L,
+            nl_newton_operators.A,
+            initial_x.vec,
+            initial_x.dof_at_maximum,
+        )
         return
 
     t0 = time.monotonic()
     all_parametrized_modes = defaultdict(list)
     for midx in range(len(modes)):
-        initial_mode = modes[midx]
-        cur_dof_at_maximum = initial_mode.dof_at_maximum
-
-        initial_x.setValues(range(system.n), initial_mode.array)
-        initial_x.setValue(system.n, initial_mode.k)
-        assert initial_x.getSize() == system.n + 1
+        initial_x = init_mode(midx)
+        cur_dof_at_maximum = initial_x.dof_at_maximum
 
         for _Di, D0 in enumerate(D0range):
             log.info(f" {D0=} ".center(80, "#"))
-            log.error(f"Starting newton algorithm for mode @ k = {initial_mode.k}")
+            log.error(f"Starting newton algorithm for mode @ k = {initial_x.k}")
             D0_constant.value = D0
 
             new_nlm = algorithms.newton(
                 nllp,
-                nlL,
-                nlA,
-                initial_x,
-                delta_x,
-                solver,
+                nl_newton_operators.L,
+                nl_newton_operators.A,
+                initial_x.vec,
+                nl_newton_operators.delta_x,
+                nl_newton_operators.solver,
                 cur_dof_at_maximum,
-                initial_mode.bcs,
+                initial_x.bcs,
             )
             cur_dof_at_maximum = new_nlm.dof_at_maximum
 
