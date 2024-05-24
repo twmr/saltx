@@ -82,7 +82,7 @@ def system():
     return namedtuple("System", list(fixture_locals.keys()))(**fixture_locals)
 
 
-def test_evaltraj(system):
+def test_evaltraj(system, infra):
     """Determine the non-interacting eigenvalues of the system from the first
     threshold till the second threshold using a newton solver (nonlasing newton
     solver)."""
@@ -220,8 +220,9 @@ def test_evaltraj(system):
         ax.plot(ka, -gt, "ro", label="singularity"),
 
         ax.grid(True)
+        return fig
 
-    scatter_plot(
+    fig = scatter_plot(
         np.asarray(
             [
                 (D0, mode.k)
@@ -232,5 +233,6 @@ def test_evaltraj(system):
         "Non-Interacting thresholds",
     )
 
+    infra.save_plot(fig)
     # TODO plot some mode profiles
     plt.show()

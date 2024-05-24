@@ -3,4 +3,4 @@ __pycache__
 # pixi environments
 .pixi
 *.egg-info
-
+plots/

@@ -88,7 +88,7 @@ def real_const(V, real_value: float) -> fem.Constant:
     return fem.Constant(V.mesh, complex(real_value, 0))
 
 
-def test_determine_first_threshold_contour_fig1(mohammed_system):
+def test_determine_first_threshold_contour_fig1(mohammed_system, infra):
     system = mohammed_system
     # first set D2=0 and scan D1
     # set D1=initialD1
@@ -215,11 +215,21 @@ def test_determine_first_threshold_contour_fig1(mohammed_system):
     norm = plt.Normalize(D1.min(), D1.max())
 
     sc1 = axes[0].scatter(k1.real, k1.imag, c=D1, norm=norm)
+    axes[0].set_title("mode '1' trajectory")
+    axes[0].set_ylabel("Real k")
+
     axes[1].scatter(k2.real, k2.imag, c=D1, norm=norm)
+    axes[1].set_title("mode '2' trajectory")
+    axes[1].set_xlabel("Imag k")
+    axes[1].set_ylabel("Real k")
 
     axes[0].grid(True)
     axes[1].grid(True)
-    fig.colorbar(sc1, ax=axes)
+
+    cbar = fig.colorbar(sc1, ax=axes)
+    cbar.set_label("D1", loc="top")
+
+    infra.save_plot(fig, name="trajs")
     plt.show()
 
     ########################
@@ -273,4 +283,5 @@ def test_determine_first_threshold_contour_fig1(mohammed_system):
     ax.set_xlabel("D1")
     ax.set_ylabel("D2")
     ax.legend()
+    infra.save_plot(fig, name="paper")
     plt.show()
