@@ -7,8 +7,54 @@
 initio laser theory".
 
 See https://link.aps.org/doi/10.1103/PhysRevA.90.023816.
+
+The cold cavity modes of the 1D slab laser (open on the right lead, closed on the left),
+which is used in Fig 3, can be calculated as follows:
+
+The length of the laser is L=1 and eps_c = 2**2 => n_c = 2
+
+Aexp(iknx) + Bexp(-iknx) = Cexp(ikx)
+C*exp(iRek x)*exp(-Imk x)
+
+x=0, A=-B  # since at x=0 there is a hard wall
+
+w.l.o.g C=1
+
+A(exp(iknL) - exp(-iknL)) = exp(ikL) at x=L (1)
+iknA*exp(iknL) + iknA*exp(-iknL) = ik*exp(ikL) (2) = iknA(exp(iknL) + exp(-iknL))
+
+(2)/(1):
+
+=> ikn(exp(iknL) + exp(-iknL))/(exp(iknL) - exp(-iknL)) = ik
+
+/ik:
+
+=> n(exp(iknL) + exp(-iknL))/(exp(iknL) - exp(-iknL)) = 1 => cot(knL) = 1/n
+
+# Note that log(-x) = log(|x|) + i*pi; see
+https://math.stackexchange.com/questions/2089690/log-of-a-negative-number
+#  --> -i * log(-x) = -i * log(|x|) + pi
+
+=> knL = 1/2(2*m*pi - i log((-n-1)/(n-1))), m in Z
+=> knL = 1/2(2*(m+1)*pi - i log( |(-n-1)/(n-1)| )), m in Z
+
+=> Imk = -1/(2nL) * log(3) = -np.log(3) / 4 / 1.0 = -0.27465 !!!
+
+(see Solution for the variable x in
+https://www.wolframalpha.com/input?i=%28exp%28i*x%29+%2B+exp%28-i*x%29%29+%2F+%28exp%28i*x%29+-+exp%28-i*x%29%29+%3D+1%2Fp)
+Rek = 1/(2nL)*(2m+1)*pi
+
+In [7]: 1/4.0*(2*np.arange(25)+1)*np.pi
+Out[7]:
+array([ 0.78539816,  2.35619449,  3.92699082,  5.49778714,  7.06858347,
+        8.6393798 , 10.21017612, 11.78097245, 13.35176878, 14.9225651 ,
+       16.49336143, 18.06415776, 19.63495408, 21.20575041, 22.77654674,
+       24.34734307, 25.91813939, 27.48893572, 29.05973205, 30.63052837,
+       32.2013247 , 33.77212103, 35.34291735, 36.91371368])
 """
+
 # TODO the system parameters seem to be wrong
+
 # the threshold of the fig 3 plot is: 0.0741 (webplotdigitizer)
 
 import logging
@@ -49,13 +95,6 @@ def system():
     ka = 30.0  # 300 mm^-1
     gt = 0.3  # 3 mm^-1
 
-    radius = 1.5 * gt
-    vscale = 1.3 * gt / radius
-    rg_params = (ka + 0.14j, radius, vscale)
-    Print(f"RG params: {rg_params}")
-    del radius
-    del vscale
-
     msh = mesh.create_interval(MPI.COMM_WORLD, points=(0, L), nx=1024)
 
     V = fem.FunctionSpace(msh, ("Lagrange", 3))
@@ -86,16 +125,18 @@ def test_evaltraj(system, infra):
     """Determine the non-interacting eigenvalues of the system from the first
     threshold till the second threshold using a newton solver (nonlasing newton
     solver)."""
-    # D0range = np.linspace(0.07, 0.22, 16)[::-1]
-    # D0range = np.linspace(0.01, 0.20, 26)[::-1]
-    # D0range = np.array(
-    #     [
-    #         0.0739,
-    #         0.0741,
-    #         0.0743,
-    #     ]
-    # )
-    D0range = np.linspace(0.07, 0.15, 20)[::-1]
+
+    # The NEVP solver is used for determining the eigenmodes, which are very close to
+    # the cold cavity modes
+    radius = 4 * system.gt
+    vscale = 0.02 * system.gt / radius
+    rg_params = (system.ka + -0.274j, radius, vscale)
+    Print(f"RG params: {rg_params}")
+    del radius
+    del vscale
+
+    D0range = np.linspace(0.003, 0.28, 25)
+    # The first threshold is close to D0=0.16
 
     u = ufl.TrialFunction(system.V)
     v = ufl.TestFunction(system.V)
@@ -115,7 +156,7 @@ def test_evaltraj(system, infra):
     nevp_inputs = algorithms.NEVPInputs(
         ka=system.ka,
         gt=system.gt,
-        rg_params=system.rg_params,
+        rg_params=rg_params,
         L=L,
         M=M,
         N=None,
@@ -215,10 +256,18 @@ def test_evaltraj(system, infra):
         cbar = fig.colorbar(sc, ax=ax)
         cbar.set_label("D0", loc="top")
 
-        plot_ellipse(ax, system.rg_params)
+        plot_ellipse(ax, rg_params)
         ka, gt = system.ka, system.gt
         ax.plot(ka, -gt, "ro", label="singularity"),
 
+        cold_cavity_k_real = np.array([29.05973205, 30.63052837])
+        cold_cavity_k_imag = np.array([-0.27465] * 2)
+
+        ax.plot(
+            cold_cavity_k_real, cold_cavity_k_imag, "rx", label="cold-cavity evals"
+        ),
+
+        ax.legend()
         ax.grid(True)
         return fig
 
