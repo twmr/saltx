@@ -1,5 +1,5 @@
 import logging
-import os
+from pathlib import Path
 
 import matplotlib
 import pytest
@@ -43,14 +43,16 @@ class _Infra:
             verticalalignment="top",
         )
 
-        # TODO clean this up
-        if not os.path.exists("plots/"):
-            os.mkdir("plots")
+        # Ensure the 'plots' directory exists
+        plots_dir = Path("plots")
+        plots_dir.mkdir(exist_ok=True)
 
+        # Generate the filename
         if name:
-            fname = f"plots/{self._node.name}_{name}.png"
+            fname = plots_dir / f"{self._node.name}_{name}.png"
         else:
-            fname = f"plots/{self._node.name}.png"
+            fname = plots_dir / f"{self._node.name}.png"
+
         fig.savefig(fname)
 
 
