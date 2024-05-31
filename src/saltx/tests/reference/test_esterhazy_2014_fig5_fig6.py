@@ -190,19 +190,22 @@ def test_nopump():
         def error(k):
             return calc_logdetT(k=k[0] + 1j * k[1])
 
+        dk = 0.5
         result = scipy.optimize.minimize(
             error,
             [kinit.real, kinit.imag],
-            # method="Nelder-Mead",
-            method="Powell",
-            # options={"maxiter": 1000},
-            # bounds=[(ks_real.min(), ks_real.max()), (ks_imag.min(), ks_imag.max())],
+            method="Nelder-Mead",
+            # method="Powell",
+            options={"maxiter": 1000},
+            bounds=[
+                (kinit.real - dk, kinit.real + dk),
+                (kinit.imag - dk, kinit.imag + dk),
+            ],
         )
         assert result.success
         solutions.append(result.x[0] + 1j * result.x[1])
 
-        # TODO I would expect a better solution with result.fun ~ -10
-        assert result.fun < -2.5
+        assert result.fun < -8
 
         print(result)
 
