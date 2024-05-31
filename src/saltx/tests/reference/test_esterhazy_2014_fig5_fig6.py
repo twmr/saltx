@@ -9,9 +9,155 @@ steady-state ab initio laser theory".
 See https://link.aps.org/doi/10.1103/PhysRevA.90.023816.
 """
 
+import logging
+import time
+from collections import defaultdict, namedtuple
+from fractions import Fraction
+
 import matplotlib.pyplot as plt
 import numpy as np
+import pytest
 import scipy.optimize
+import ufl
+from dolfinx import fem
+from petsc4py import PETSc
+from ufl import dx, inner, nabla_grad
+
+from saltx import algorithms, nonlasing
+from saltx.assemble import assemble_form
+from saltx.mesh import create_combined_interval_mesh, create_dcells
+from saltx.nonlasing import NonLasingInitialX, NonLasingLinearProblem
+from saltx.plot import plot_ellipse
+
+log = logging.getLogger(__name__)
+
+Print = PETSc.Sys.Print
+
+
+def real_const(V, real_value: float) -> fem.Constant:
+    return fem.Constant(V.mesh, complex(real_value, 0))
+
+
+@pytest.fixture()
+def system():
+    use_pml = False
+    if not use_pml:
+        domains = [
+            (None, Fraction("1"), 1000),
+            (None, Fraction("0.1"), 100),
+            (None, Fraction("1"), 1000),
+        ]
+        xstart = Fraction("0.0")
+    else:
+        domains = [
+            (None, Fraction("0.8"), 500),
+            (None, Fraction("0.2"), 100),
+            (None, Fraction("1"), 1000),
+            (None, Fraction("0.1"), 100),
+            (None, Fraction("1"), 1000),
+            (None, Fraction("0.2"), 100),
+            (None, Fraction("0.8"), 500),
+        ]
+        xstart = Fraction("-1.0")
+    msh = create_combined_interval_mesh(xstart, domains)
+    dcells = create_dcells(msh, xstart, domains)
+
+    dielec = fem.Function(fem.FunctionSpace(msh, ("DG", 0)))
+    invperm = fem.Function(fem.FunctionSpace(msh, ("DG", 0)))
+    pump_left = fem.Function(fem.FunctionSpace(msh, ("DG", 0)))
+    pump_right = fem.Function(fem.FunctionSpace(msh, ("DG", 0)))
+
+    n_cav = 3 + 0.13j
+    ka = 9.46
+    # the width of a lorentian/cauchy function is 2*gt
+    # 2*gt = 0.4
+    gt = 0.2
+
+    radius = 3.0 * gt
+    vscale = 0.5 * gt / radius
+    rg_params = (ka - 0.5j, radius, vscale)
+    Print(f"RG params: {rg_params}")
+    del radius
+    del vscale
+
+    def cset(func, cells, value):
+        func.x.array[cells] = np.full_like(
+            cells,
+            value,
+            dtype=PETSc.ScalarType,
+        )
+
+    cells = dcells[2 if use_pml else 0]
+    cset(dielec, cells, n_cav**2)
+    cset(invperm, cells, 1.0)
+    cset(pump_left, cells, 1.0)
+    cset(pump_right, cells, 0.0)
+    cells = dcells[3 if use_pml else 1]
+    cset(dielec, cells, 1.0)
+    cset(invperm, cells, 1.0)
+    cset(pump_left, cells, 0.0)
+    cset(pump_right, cells, 0.0)
+    cells = dcells[4 if use_pml else 2]
+    cset(dielec, cells, n_cav**2)
+    cset(invperm, cells, 1.0)
+    cset(pump_left, cells, 0.0)
+    cset(pump_right, cells, 1.0)
+    if use_pml:
+        alpha_pml = 2j
+        for cells in [dcells[0], dcells[6]]:
+            cset(dielec, cells, 1 + alpha_pml)
+            cset(invperm, cells, 1.0 / (1 + alpha_pml))
+            # PML alpha term must no be included to avoid wrong eigenvalues
+            cset(pump_left, cells, 0.0)
+            cset(pump_right, cells, 0.0)
+        for cells in [dcells[1], dcells[5]]:
+            cset(dielec, cells, 1)
+            cset(invperm, cells, 1)
+            cset(pump_left, cells, 0.0)
+            cset(pump_right, cells, 0.0)
+
+    V = fem.FunctionSpace(msh, ("Lagrange", 3))
+
+    evaluator = algorithms.Evaluator(
+        V,
+        msh,
+        # we only care about the mode intensity at the left and right
+        np.array([0.0, 2.1]),
+    )
+
+    fine_evaluator = algorithms.Evaluator(
+        V,
+        msh,
+        np.linspace(0.0, 2.1, 4 * 128),
+    )
+
+    ds_obc = ufl.ds
+    bcs = []
+    bcs_norm_constraint = fem.locate_dofs_geometrical(
+        V,
+        lambda x: x[0] > 0.75,
+    )
+    bcs_norm_constraint = bcs_norm_constraint[:1]
+    Print(f"{bcs_norm_constraint=}")
+
+    n = V.dofmap.index_map.size_global
+    et = PETSc.Vec().createSeq(n)
+    et.setValue(bcs_norm_constraint[0], 1.0)
+
+    fixture_locals = locals()
+    return namedtuple("System", list(fixture_locals.keys()))(**fixture_locals)
+
+
+def get_D0s(pump_parameter: float) -> tuple[float, float]:
+    Dmax = 1.2
+    D0left, D0right = Dmax * min(pump_parameter, 1.0), 0.0
+    if pump_parameter > 1.0:
+        D0right = Dmax * (pump_parameter - 1.0)
+
+    Print(f"{D0left=} {D0right=}")
+    breakpoint()
+
+    return D0left, D0right
 
 
 def calc_logdetT(k: complex) -> float:
@@ -212,4 +358,167 @@ def test_nopump():
     assert abs(solutions[0] - (93.42 - 5.142j)) < 0.1
     assert abs(solutions[1] - (95.86 - 5.275j)) < 0.1
 
+    plt.show()
+
+
+def test_evaltraj(system, infra):
+    """Determine the non-interacting eigenvalues of the system from the first
+    threshold till the second threshold using a newton solver (nonlasing newton
+    solver)."""
+
+    # pump_range = np.linspace(0.003, 0.28, 25)
+    # pump_range = np.linspace(0.85, 1.6, 40)
+    pump_range = np.linspace(0.01, 0.02, 2)
+
+    # The first threshold is close to D0=0.16
+
+    u = ufl.TrialFunction(system.V)
+    v = ufl.TestFunction(system.V)
+
+    D0left, D0right = get_D0s(pump_range[0])
+    D0left_constant = real_const(system.V, D0left)
+    D0right_constant = real_const(system.V, D0right)
+
+    L = assemble_form(
+        -inner(system.invperm * nabla_grad(u), nabla_grad(v)) * dx, system.bcs, name="L"
+    )
+    M = assemble_form(system.dielec * inner(u, v) * dx, system.bcs, diag=0.0, name="M")
+    Q = assemble_form(
+        (D0left_constant * system.pump_left + D0right_constant * system.pump_right)
+        * inner(u, v)
+        * dx,
+        system.bcs,
+        diag=0.0,
+        name="Q",
+    )
+    R = assemble_form(inner(u, v) * system.ds_obc, system.bcs, diag=0.0, name="R")
+
+    nevp_inputs = algorithms.NEVPInputs(
+        ka=system.ka,
+        gt=system.gt,
+        rg_params=system.rg_params,
+        L=L,
+        M=M,
+        N=None,
+        Q=Q,
+        R=R,
+        bcs=system.bcs,
+    )
+
+    modes = algorithms.get_nevp_modes(nevp_inputs)
+
+    nllp = NonLasingLinearProblem(
+        V=system.V,
+        ka=system.ka,
+        gt=system.gt,
+        dielec=system.dielec,
+        invperm=system.invperm,
+        sigma_c=None,
+        pump=(
+            D0left_constant * system.pump_left + D0right_constant * system.pump_right
+        ),
+        bcs=system.bcs,
+        ds_obc=ufl.ds,
+    )
+
+    nl_newton_operators = nonlasing.create_solver_and_matrices(nllp, nmodes=len(modes))
+
+    def update_dofmax_of_initial_mode(nlm, init_x: NonLasingInitialX) -> None:
+        init_x.dof_at_maximum = nlm.dof_at_maximum
+
+    def init_mode(mode_idx: int) -> NonLasingInitialX:
+        init_x: NonLasingInitialX = nl_newton_operators.initial_x_seq[mode_idx]
+        mode = modes[mode_idx]
+
+        init_x.vec.setValues(range(system.n), mode.array)
+        init_x.vec.setValue(system.n, mode.k)
+        assert init_x.vec.getSize() == system.n + 1
+        update_dofmax_of_initial_mode(mode, init_x)
+        return init_x
+
+    if False:
+        initial_x = init_mode(0)
+        nllp.assemble_F_and_J(
+            nl_newton_operators.L,
+            nl_newton_operators.A,
+            initial_x.vec,
+            initial_x.dof_at_maximum,
+        )
+        return
+
+    t0 = time.monotonic()
+    all_parametrized_modes = defaultdict(list)
+    for midx in range(len(modes)):
+        initial_x = init_mode(midx)
+        cur_dof_at_maximum = initial_x.dof_at_maximum
+
+        for pump in pump_range:
+            log.info(f" {pump=} ".center(80, "#"))
+            log.error(f"Starting newton algorithm for mode @ k = {initial_x.k}")
+
+            D0left_constant.value, D0right_constant.value = get_D0s(pump)
+
+            new_nlm = algorithms.newton(
+                nllp,
+                nl_newton_operators.L,
+                nl_newton_operators.A,
+                initial_x.vec,
+                nl_newton_operators.delta_x,
+                nl_newton_operators.solver,
+                cur_dof_at_maximum,
+                initial_x.bcs,
+            )
+            cur_dof_at_maximum = new_nlm.dof_at_maximum
+
+            all_parametrized_modes[pump].append(new_nlm)
+            # In this loop we use the current mode as an initial guess for the mode at
+            # the next D0 -> we keep initial_x as is.
+
+    t_total = time.monotonic() - t0
+    log.info(
+        f"The eval trajectory code ({pump_range.size} D0 steps) took"
+        f"{t_total:.1f}s (avg per iteration: {t_total/pump_range.size:.3f}s)",
+    )
+
+    def scatter_plot(vals, title):
+        fig, ax = plt.subplots()
+        fig.suptitle(title)
+
+        merged = np.vstack(vals)
+        X, Y, C = (
+            merged[:, 1].real,
+            merged[:, 1].imag,
+            merged[:, 0].real,
+        )
+        norm = plt.Normalize(C.min(), C.max())
+
+        sc = ax.scatter(X, Y, c=C, norm=norm)
+        ax.set_xlabel("k.real")
+        ax.set_ylabel("k.imag")
+
+        cbar = fig.colorbar(sc, ax=ax)
+        cbar.set_label("D0", loc="top")
+
+        plot_ellipse(ax, system.rg_params)
+        ka, gt = system.ka, system.gt
+        ax.plot(ka, -gt, "ro", label="singularity")
+        ax.plot([9.342, 9.586], [-0.5142, -0.5275], "rx", label="cold-cavity mode")
+
+        ax.legend()
+        ax.grid(True)
+        return fig
+
+    fig = scatter_plot(
+        np.asarray(
+            [
+                (D0, mode.k)
+                for D0, modes in all_parametrized_modes.items()
+                for mode in modes
+            ],
+        ),
+        "Non-Interacting thresholds",
+    )
+
+    infra.save_plot(fig)
+    # TODO plot some mode profiles
     plt.show()
