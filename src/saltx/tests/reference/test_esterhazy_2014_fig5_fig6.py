@@ -13,6 +13,7 @@ import logging
 import time
 from collections import defaultdict, namedtuple
 from fractions import Fraction
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -32,6 +33,7 @@ from saltx.plot import plot_ellipse
 log = logging.getLogger(__name__)
 
 Print = PETSc.Sys.Print
+reference_test_dir = Path(__file__).parent
 
 
 def real_const(V, real_value: float) -> fem.Constant:
@@ -71,11 +73,14 @@ def system():
     ka = 9.46
     # the width of a lorentian/cauchy function is 2*gt
     # 2*gt = 0.4
-    gt = 0.2
 
-    radius = 3.0 * gt
-    vscale = 0.5 * gt / radius
-    rg_params = (ka - 0.5j, radius, vscale)
+    # it seems as if gt=1.0 was used for the calculations and not gt=0.2, because the
+    # saltx with gt=1.0 perfrectly match the fig6 results from the paper.
+    gt = 1.0
+
+    radius = 1.0 * gt
+    vscale = 0.1 * gt / radius
+    rg_params = (ka, radius, vscale)
     Print(f"RG params: {rg_params}")
     del radius
     del vscale
@@ -155,8 +160,6 @@ def get_D0s(pump_parameter: float) -> tuple[float, float]:
         D0right = Dmax * (pump_parameter - 1.0)
 
     Print(f"{D0left=} {D0right=}")
-    breakpoint()
-
     return D0left, D0right
 
 
@@ -369,6 +372,10 @@ def test_evaltraj(system, infra):
     # pump_range = np.linspace(0.003, 0.28, 25)
     # pump_range = np.linspace(0.85, 1.6, 40)
     pump_range = np.linspace(0.01, 0.02, 2)
+    pump_range = np.linspace(0.94, 0.99, 10)
+    pump_range = np.linspace(0.94, 0.002, 60)
+    pump_range = np.linspace(1.8, 0.002, 100)
+    # pump_range = np.linspace(1.8, 1.6, 10)
 
     # The first threshold is close to D0=0.16
 
@@ -492,9 +499,9 @@ def test_evaltraj(system, infra):
         )
         norm = plt.Normalize(C.min(), C.max())
 
-        sc = ax.scatter(X, Y, c=C, norm=norm)
-        ax.set_xlabel("k.real")
-        ax.set_ylabel("k.imag")
+        sc = ax.scatter(X, Y, c=C, norm=norm, alpha=1.0, label="saltx")
+        ax.set_xlabel("Re(k)")
+        ax.set_ylabel("Im(k)")
 
         cbar = fig.colorbar(sc, ax=ax)
         cbar.set_label("D0", loc="top")
@@ -504,11 +511,31 @@ def test_evaltraj(system, infra):
         ax.plot(ka, -gt, "ro", label="singularity")
         ax.plot([9.342, 9.586], [-0.5142, -0.5275], "rx", label="cold-cavity mode")
 
-        ax.legend()
         ax.grid(True)
-        return fig
+        return fig, ax
 
-    fig = scatter_plot(
+    fig, ax = scatter_plot(
+        np.asarray(
+            [
+                (D0, mode.k)
+                for D0, modes in all_parametrized_modes.items()
+                for mode in modes
+            ],
+        ),
+        "Non-Interacting thresholds",
+    )
+    scale = 0.1
+    data = np.loadtxt(reference_test_dir / "esterhazy_ep_fig6_red.csv", delimiter=",")
+    ax.plot(data[:, 0] * scale, data[:, 1] * scale, "ro", alpha=0.1, label="paper")
+    data = np.loadtxt(reference_test_dir / "esterhazy_ep_fig6_blue.csv", delimiter=",")
+    ax.plot(data[:, 0] * scale, data[:, 1] * scale, "bo", alpha=0.1, label="paper")
+    ax.legend()
+
+    ax.set_xlim([9.325, 9.6])
+    ax.set_ylim([-0.6, 0.1])
+    infra.save_plot(fig, name="full")
+
+    fig, ax = scatter_plot(
         np.asarray(
             [
                 (D0, mode.k)
@@ -519,6 +546,50 @@ def test_evaltraj(system, infra):
         "Non-Interacting thresholds",
     )
 
-    infra.save_plot(fig)
+    scale = 0.1
+    data = np.loadtxt(
+        reference_test_dir / "esterhazy_ep_fig6_red_zoomed.csv", delimiter=","
+    )
+    ax.plot(data[:, 0] * scale, data[:, 1] * scale, "ro", alpha=0.1, label="paper")
+    data = np.loadtxt(
+        reference_test_dir / "esterhazy_ep_fig6_blue_zoomed.csv", delimiter=","
+    )
+    ax.plot(data[:, 0] * scale, data[:, 1] * scale, "bo", alpha=0.1, label="paper")
+    ax.legend()
+
+    ax.set_xlim([9.41, 9.56])
+    ax.set_ylim([-0.04, 0.04])
+    infra.save_plot(fig, name="zoom")
     # TODO plot some mode profiles
+    plt.show()
+
+
+def test_plot_fig6_ref_data_from_paper(infra):
+    fig, ax = plt.subplots()
+    ax.grid(True)
+
+    data = np.loadtxt(
+        reference_test_dir / "esterhazy_ep_fig6_red_zoomed.csv", delimiter=","
+    )
+    ax.plot(data[:, 0], data[:, 1], "ro", alpha=0.2, label="paper")
+    data = np.loadtxt(
+        reference_test_dir / "esterhazy_ep_fig6_blue_zoomed.csv", delimiter=","
+    )
+    ax.plot(data[:, 0], data[:, 1], "bo", alpha=0.2, label="paper")
+
+    ax.set_xlabel("Re(k) [mm^-1]")
+    ax.set_ylabel("Im(k) [mm^-1]")
+    infra.save_plot(fig, name="b")
+
+    fig, ax = plt.subplots()
+    ax.grid(True)
+
+    data = np.loadtxt(reference_test_dir / "esterhazy_ep_fig6_red.csv", delimiter=",")
+    ax.plot(data[:, 0], data[:, 1], "ro", alpha=0.2, label="paper")
+    data = np.loadtxt(reference_test_dir / "esterhazy_ep_fig6_blue.csv", delimiter=",")
+    ax.plot(data[:, 0], data[:, 1], "bo", alpha=0.2, label="paper")
+
+    ax.set_xlabel("Re(k) [mm^-1]")
+    ax.set_ylabel("Im(k) [mm^-1]")
+    infra.save_plot(fig, name="a")
     plt.show()
