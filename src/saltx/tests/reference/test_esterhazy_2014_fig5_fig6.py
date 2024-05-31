@@ -159,7 +159,7 @@ def test_nopump():
             cax = ax.pcolormesh(Kr, Ki, logdet, shading="gouraud")
 
         ax.set_xlabel("k.real")
-        ax.set_ylabel("k.real")
+        ax.set_ylabel("k.imag")
         fig.colorbar(cax, ax=ax)
         plt.show()
 
