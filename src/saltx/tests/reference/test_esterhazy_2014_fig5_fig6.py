@@ -24,11 +24,12 @@ from dolfinx import fem
 from petsc4py import PETSc
 from ufl import dx, inner, nabla_grad
 
-from saltx import algorithms, nonlasing
+from saltx import algorithms, newtils, nonlasing
 from saltx.assemble import assemble_form
+from saltx.lasing import NonLinearProblem
 from saltx.mesh import create_combined_interval_mesh, create_dcells
 from saltx.nonlasing import NonLasingInitialX, NonLasingLinearProblem
-from saltx.plot import plot_ellipse
+from saltx.plot import plot_ciss_eigenvalues, plot_ellipse
 
 log = logging.getLogger(__name__)
 
@@ -78,8 +79,8 @@ def system():
     # saltx with gt=1.0 perfectly match the fig6 results from the paper.
     gt = 10.0
 
-    radius = 1.0 * gt
-    vscale = 0.1 * gt / radius
+    radius = 0.5 * gt
+    vscale = 1.6
     rg_params = (ka, radius, vscale)
     Print(f"RG params: {rg_params}")
     del radius
@@ -591,4 +592,167 @@ def test_plot_fig6_ref_data_from_paper(infra):
     ax.set_xlabel("Re(k) [mm^-1]")
     ax.set_ylabel("Im(k) [mm^-1]")
     infra.save_plot(fig, name="a")
+    plt.show()
+
+
+def test_fig5_intens(system, infra):
+    # we see in this test that the results, obtained with a system with gt=10.0,
+    # perfectly match the results from the paper.
+
+    u = ufl.TrialFunction(system.V)
+    v = ufl.TestFunction(system.V)
+
+    # pump_range = np.linspace(1.6, 2.0, 19)
+    pump_range = np.linspace(0.94, 1.6, 10)
+
+    D0left, D0right = get_D0s(pump_range[0])
+    D0left_constant = real_const(system.V, D0left)
+    D0right_constant = real_const(system.V, D0right)
+
+    pump_expr = (
+        D0left_constant * system.pump_left + D0right_constant * system.pump_right
+    )
+
+    L = assemble_form(
+        -inner(system.invperm * nabla_grad(u), nabla_grad(v)) * dx, system.bcs, name="L"
+    )
+    M = assemble_form(system.dielec * inner(u, v) * dx, system.bcs, diag=0.0, name="M")
+    Q = assemble_form(
+        pump_expr * inner(u, v) * dx,
+        system.bcs,
+        diag=0.0,
+        name="Q",
+    )
+
+    if system.use_pml:
+        R = None
+    else:
+        R = assemble_form(inner(u, v) * system.ds_obc, system.bcs, diag=0.0, name="R")
+
+    nevp_inputs = algorithms.NEVPInputs(
+        ka=system.ka,
+        gt=system.gt,
+        rg_params=system.rg_params,
+        L=L,
+        M=M,
+        N=None,
+        Q=Q,
+        R=R,
+        bcs=system.bcs,
+    )
+
+    nlp = NonLinearProblem(
+        system.V,
+        system.ka,
+        system.gt,
+        dielec=system.dielec,
+        invperm=system.invperm,
+        n=system.n,
+        pump=pump_expr,
+        ds_obc=system.ds_obc,
+    )
+
+    newton_operators = newtils.create_multimode_solvers_and_matrices(nlp, max_nmodes=2)
+
+    aevals = []
+    results = []  # list of (pump, intensity, fine-intensity) triples
+    for pump in pump_range:
+        # TODO optimize this loop
+        Print(f"###### {pump=} ######")
+        D0left_constant.value, D0right_constant.value = get_D0s(pump)
+
+        assemble_form(
+            pump_expr * inner(u, v) * dx,
+            system.bcs,
+            diag=0.0,
+            mat=nevp_inputs.Q,
+            name="Q-update",
+        )
+
+        modes = algorithms.get_nevp_modes(nevp_inputs)
+        evals = np.asarray([mode.k for mode in modes])
+        assert evals.size
+
+        if False:
+            plot_ciss_eigenvalues(
+                evals, params=system.rg_params, kagt=(system.ka, system.gt)
+            )
+
+        multi_modes = algorithms.constant_pump_algorithm(
+            modes,
+            nevp_inputs,
+            nlp,
+            newton_operators,
+        )
+
+        if multi_modes:
+            for mode in multi_modes:
+                mode_values = system.evaluator(mode)
+                mode_intensity = abs(mode_values) ** 2
+                Print(f"-> {mode_intensity=}")
+                fine_mode_values = system.fine_evaluator(mode)
+                fine_mode_intensity = abs(fine_mode_values) ** 2
+                results.append((pump, mode_intensity.sum(), fine_mode_intensity))
+        else:
+            # no mode is lasing
+            results.append((pump, 0.0, None))
+        aevals.append(evals)
+
+    fig, ax = plt.subplots()
+
+    ref_fname1 = "ep_mode1.csv"
+    ref_fname2 = "ep_mode2.csv"
+
+    ref_mode1 = np.loadtxt(reference_test_dir / ref_fname1, delimiter=",")
+    ref_mode2 = np.loadtxt(reference_test_dir / ref_fname2, delimiter=",")
+
+    ax.plot(
+        ref_mode1[:, 0],
+        ref_mode1[:, 1],
+        "ro",
+        alpha=0.2,
+        label="paper mode1",
+    )
+    ax.plot(
+        ref_mode2[:, 0],
+        ref_mode2[:, 1],
+        "ko",
+        alpha=0.2,
+        label="paper mode2",
+    )
+
+    ax.plot(
+        [d for (d, _, _) in results],
+        [intens for (_, intens, _) in results],
+        "x",
+        label="saltx",
+    )
+
+    ax.set_xlabel("Pump parameter d")
+    ax.set_ylabel("Sum of |psi|^2 evaluated at both ends")
+    ax.grid(True)
+    ax.legend()
+    infra.save_plot(fig, name="pump_vs_intens")
+
+    if results[0][2] is not None:
+        # plot the modal intensity of a mode
+        fig, ax = plt.subplots()
+        ax.plot(
+            system.fine_evaluator.points,
+            results[0][2],
+            "-",
+        )
+        ax.set_xlabel("x [mm]")
+        ax.set_ylabel(f"Modal intensity at pump={results[0][0]}")
+        ax.axvline(x=0.0)
+        ax.axvline(x=0.1)
+        ax.axvline(x=0.11)
+        ax.axvline(x=0.21)
+        ax.grid(True)
+        infra.save_plot(fig, name="modalintens")
+
+    plot_ciss_eigenvalues(
+        np.concatenate(aevals), params=system.rg_params, kagt=(system.ka, system.gt)
+    )
+
     plt.show()
