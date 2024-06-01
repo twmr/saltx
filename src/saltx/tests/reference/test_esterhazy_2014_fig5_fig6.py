@@ -45,20 +45,20 @@ def system():
     use_pml = False
     if not use_pml:
         domains = [
-            (None, Fraction("1"), 1000),
-            (None, Fraction("0.1"), 100),
-            (None, Fraction("1"), 1000),
+            (None, Fraction("0.1"), 1000),
+            (None, Fraction("0.01"), 100),
+            (None, Fraction("0.1"), 1000),
         ]
         xstart = Fraction("0.0")
     else:
         domains = [
-            (None, Fraction("0.8"), 500),
-            (None, Fraction("0.2"), 100),
-            (None, Fraction("1"), 1000),
-            (None, Fraction("0.1"), 100),
-            (None, Fraction("1"), 1000),
-            (None, Fraction("0.2"), 100),
-            (None, Fraction("0.8"), 500),
+            (None, Fraction("0.08"), 500),
+            (None, Fraction("0.02"), 100),
+            (None, Fraction("0.1"), 1000),
+            (None, Fraction("0.01"), 100),
+            (None, Fraction("0.1"), 1000),
+            (None, Fraction("0.02"), 100),
+            (None, Fraction("0.08"), 500),
         ]
         xstart = Fraction("-1.0")
     msh = create_combined_interval_mesh(xstart, domains)
@@ -70,13 +70,13 @@ def system():
     pump_right = fem.Function(fem.FunctionSpace(msh, ("DG", 0)))
 
     n_cav = 3 + 0.13j
-    ka = 9.46
+    ka = 94.6
     # the width of a lorentian/cauchy function is 2*gt
-    # 2*gt = 0.4
+    # 2*gt = 4
 
-    # it seems as if gt=1.0 was used for the calculations and not gt=0.2, because the
-    # saltx with gt=1.0 perfrectly match the fig6 results from the paper.
-    gt = 1.0
+    # it seems as if gt=10.0 was used for the calculations and not gt=2, because the
+    # saltx with gt=1.0 perfectly match the fig6 results from the paper.
+    gt = 10.0
 
     radius = 1.0 * gt
     vscale = 0.1 * gt / radius
@@ -127,20 +127,20 @@ def system():
         V,
         msh,
         # we only care about the mode intensity at the left and right
-        np.array([0.0, 2.1]),
+        np.array([0.0, 0.21]),
     )
 
     fine_evaluator = algorithms.Evaluator(
         V,
         msh,
-        np.linspace(0.0, 2.1, 4 * 128),
+        np.linspace(0.0, 0.21, 4 * 128),
     )
 
     ds_obc = ufl.ds
     bcs = []
     bcs_norm_constraint = fem.locate_dofs_geometrical(
         V,
-        lambda x: x[0] > 0.75,
+        lambda x: x[0] > 0.075,
     )
     bcs_norm_constraint = bcs_norm_constraint[:1]
     Print(f"{bcs_norm_constraint=}")
@@ -167,7 +167,7 @@ def calc_logdetT(k: complex) -> float:
     ik = 1j * k
 
     # system parameters
-    n1 = n3 = 3 + 0.13j  # refactive index of the two 100um slabs
+    n1 = n3 = 3 + 0.13j  # refractive index of the two 100um slabs
     n2 = 1.0  # air-gap
 
     L1 = L3 = 0.1  # 100um
@@ -501,8 +501,8 @@ def test_evaltraj(system, infra):
         norm = plt.Normalize(C.min(), C.max())
 
         sc = ax.scatter(X, Y, c=C, norm=norm, alpha=1.0, label="saltx")
-        ax.set_xlabel("Re(k)")
-        ax.set_ylabel("Im(k)")
+        ax.set_xlabel("Re(k) [mm^-1]")
+        ax.set_ylabel("Im(k) [mm^-1]")
 
         cbar = fig.colorbar(sc, ax=ax)
         cbar.set_label("D0", loc="top")
@@ -510,7 +510,7 @@ def test_evaltraj(system, infra):
         plot_ellipse(ax, system.rg_params)
         ka, gt = system.ka, system.gt
         ax.plot(ka, -gt, "ro", label="singularity")
-        ax.plot([9.342, 9.586], [-0.5142, -0.5275], "rx", label="cold-cavity mode")
+        ax.plot([93.42, 95.86], [-5.142, -5.275], "rx", label="cold-cavity mode")
 
         ax.grid(True)
         return fig, ax
@@ -525,15 +525,14 @@ def test_evaltraj(system, infra):
         ),
         "Non-Interacting thresholds",
     )
-    scale = 0.1
     data = np.loadtxt(reference_test_dir / "esterhazy_ep_fig6_red.csv", delimiter=",")
-    ax.plot(data[:, 0] * scale, data[:, 1] * scale, "ro", alpha=0.1, label="paper")
+    ax.plot(data[:, 0], data[:, 1], "ro", alpha=0.1, label="paper")
     data = np.loadtxt(reference_test_dir / "esterhazy_ep_fig6_blue.csv", delimiter=",")
-    ax.plot(data[:, 0] * scale, data[:, 1] * scale, "bo", alpha=0.1, label="paper")
+    ax.plot(data[:, 0], data[:, 1], "bo", alpha=0.1, label="paper")
     ax.legend()
 
-    ax.set_xlim([9.325, 9.6])
-    ax.set_ylim([-0.6, 0.1])
+    ax.set_xlim([93.25, 96])
+    ax.set_ylim([-6, 1])
     infra.save_plot(fig, name="full")
 
     fig, ax = scatter_plot(
@@ -547,19 +546,18 @@ def test_evaltraj(system, infra):
         "Non-Interacting thresholds",
     )
 
-    scale = 0.1
     data = np.loadtxt(
         reference_test_dir / "esterhazy_ep_fig6_red_zoomed.csv", delimiter=","
     )
-    ax.plot(data[:, 0] * scale, data[:, 1] * scale, "ro", alpha=0.1, label="paper")
+    ax.plot(data[:, 0], data[:, 1], "ro", alpha=0.1, label="paper")
     data = np.loadtxt(
         reference_test_dir / "esterhazy_ep_fig6_blue_zoomed.csv", delimiter=","
     )
-    ax.plot(data[:, 0] * scale, data[:, 1] * scale, "bo", alpha=0.1, label="paper")
+    ax.plot(data[:, 0], data[:, 1], "bo", alpha=0.1, label="paper")
     ax.legend()
 
-    ax.set_xlim([9.41, 9.56])
-    ax.set_ylim([-0.04, 0.04])
+    ax.set_xlim([94.1, 95.6])
+    ax.set_ylim([-0.4, 0.4])
     infra.save_plot(fig, name="zoom")
     # TODO plot some mode profiles
     plt.show()
