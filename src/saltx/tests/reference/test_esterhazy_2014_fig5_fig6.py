@@ -30,6 +30,7 @@ from saltx.lasing import NonLinearProblem
 from saltx.mesh import create_combined_interval_mesh, create_dcells
 from saltx.nonlasing import NonLasingInitialX, NonLasingLinearProblem
 from saltx.plot import plot_ciss_eigenvalues, plot_ellipse
+from saltx.trace import tracer
 
 log = logging.getLogger(__name__)
 
@@ -659,44 +660,51 @@ def test_fig5_intens(system, infra):
     for pump in pump_range:
         # TODO optimize this loop
         Print(f"###### {pump=} ######")
-        D0left_constant.value, D0right_constant.value = get_D0s(pump)
+        with tracer.span(f"{pump=}"):
+            D0left_constant.value, D0right_constant.value = get_D0s(pump)
 
-        assemble_form(
-            pump_expr * inner(u, v) * dx,
-            system.bcs,
-            diag=0.0,
-            mat=nevp_inputs.Q,
-            name="Q-update",
-        )
+            with tracer.span("assemble_form Q-update"):
+                assemble_form(
+                    pump_expr * inner(u, v) * dx,
+                    system.bcs,
+                    diag=0.0,
+                    mat=nevp_inputs.Q,
+                    name="Q-update",
+                )
 
-        modes = algorithms.get_nevp_modes(nevp_inputs)
-        evals = np.asarray([mode.k for mode in modes])
-        assert evals.size
+            with tracer.span("solve NEVP"):
+                modes = algorithms.get_nevp_modes(nevp_inputs)
+            evals = np.asarray([mode.k for mode in modes])
+            assert evals.size
 
-        if False:
-            plot_ciss_eigenvalues(
-                evals, params=system.rg_params, kagt=(system.ka, system.gt)
-            )
+            if False:
+                plot_ciss_eigenvalues(
+                    evals, params=system.rg_params, kagt=(system.ka, system.gt)
+                )
 
-        multi_modes = algorithms.constant_pump_algorithm(
-            modes,
-            nevp_inputs,
-            nlp,
-            newton_operators,
-        )
+            with tracer.span("constant pump algorithm"):
+                multi_modes = algorithms.constant_pump_algorithm(
+                    modes,
+                    nevp_inputs,
+                    nlp,
+                    newton_operators,
+                )
 
-        if multi_modes:
-            for mode in multi_modes:
-                mode_values = system.evaluator(mode)
-                mode_intensity = abs(mode_values) ** 2
-                Print(f"-> {mode_intensity=}")
-                fine_mode_values = system.fine_evaluator(mode)
-                fine_mode_intensity = abs(fine_mode_values) ** 2
-                results.append((pump, mode_intensity.sum(), fine_mode_intensity))
-        else:
-            # no mode is lasing
-            results.append((pump, 0.0, None))
-        aevals.append(evals)
+            if multi_modes:
+                with tracer.span("evaluation of modes"):
+                    for mode in multi_modes:
+                        mode_values = system.evaluator(mode)
+                        mode_intensity = abs(mode_values) ** 2
+                        Print(f"-> {mode_intensity=}")
+                        fine_mode_values = system.fine_evaluator(mode)
+                        fine_mode_intensity = abs(fine_mode_values) ** 2
+                        results.append(
+                            (pump, mode_intensity.sum(), fine_mode_intensity)
+                        )
+            else:
+                # no mode is lasing
+                results.append((pump, 0.0, None))
+            aevals.append(evals)
 
     fig, ax = plt.subplots()
 

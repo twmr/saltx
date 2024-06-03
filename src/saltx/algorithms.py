@@ -132,6 +132,7 @@ def get_nevp_modes(
     details about this solver see
     https://slepc.upv.es/documentation/reports/str11.pdf
     """
+    log.debug("Beginning of get_nevp_modes")
     t0 = time.monotonic()
     gt = nevp_inputs.gt
     ka = nevp_inputs.ka
@@ -501,7 +502,8 @@ def constant_pump_algorithm(
         Q.assemble()
         log.debug("After assembly of Q with custom sht")
 
-        modes = get_nevp_modes(nevp_inputs)
+        with tracer.span("solve NEVP"):
+            modes = get_nevp_modes(nevp_inputs)
         evals = np.asarray([mode.k for mode in modes])
 
         number_of_modes_close_to_real_axis = np.sum(
