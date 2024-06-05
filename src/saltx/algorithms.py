@@ -563,7 +563,7 @@ def newton(
     newton_steps = []
     while i < max_iterations:
         tstart = time.monotonic()
-        with tracer.span("assemble F vec and J matrix"):
+        with tracer.span(f"nonlasing newton[{i=}] assemble F vec and J matrix"):
             nllp.assemble_F_and_J(nlL, nlA, initial_x, initial_dof_at_maximum)
         nlL.ghostUpdate(
             addv=PETSc.InsertMode.ADD_VALUES,
@@ -576,7 +576,7 @@ def newton(
             mode=PETSc.ScatterMode.FORWARD,
         )
 
-        with tracer.span("Solve KSP"):
+        with tracer.span(f"nonlasing newton[{i=}] Solve KSP"):
             solver.solve(nlL, delta_x)
 
         relaxation_param = 1.0

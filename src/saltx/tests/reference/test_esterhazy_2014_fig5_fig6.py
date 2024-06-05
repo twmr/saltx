@@ -604,7 +604,7 @@ def test_fig5_intens(system, infra):
     v = ufl.TestFunction(system.V)
 
     # pump_range = np.linspace(1.6, 2.0, 19)
-    pump_range = np.linspace(0.94, 1.6, 10)
+    pump_range = np.linspace(0.94, 2.0, 16)
 
     D0left, D0right = get_D0s(pump_range[0])
     D0left_constant = real_const(system.V, D0left)
@@ -653,7 +653,52 @@ def test_fig5_intens(system, infra):
         ds_obc=system.ds_obc,
     )
 
+    nllp = NonLasingLinearProblem(
+        V=system.V,
+        ka=system.ka,
+        gt=system.gt,
+        dielec=system.dielec,
+        invperm=system.invperm,
+        sigma_c=None,
+        pump=pump_expr,
+        bcs=system.bcs,
+        ds_obc=ufl.ds,
+    )
+
     newton_operators = newtils.create_multimode_solvers_and_matrices(nlp, max_nmodes=2)
+
+    nl_newton_operators = nonlasing.create_solver_and_matrices(nllp, nmodes=2)
+
+    def update_dofmax_of_initial_mode(nlm, init_x: NonLasingInitialX) -> None:
+        init_x.dof_at_maximum = nlm.dof_at_maximum
+
+    def init_mode(mode_idx: int) -> NonLasingInitialX:
+        init_x: NonLasingInitialX = nl_newton_operators.initial_x_seq[mode_idx]
+        mode = modes[mode_idx]
+        init_x.vec.setValues(range(system.n), mode.array)
+        init_x.vec.setValue(system.n, mode.k)
+        assert init_x.vec.getSize() == system.n + 1
+        update_dofmax_of_initial_mode(mode, init_x)
+        return init_x
+
+    with tracer.span("solve initial NEVP"):
+        pump = pump_range[0]
+        D0left_constant.value, D0right_constant.value = get_D0s(pump)
+
+        with tracer.span("assemble_form Q-update"):
+            assemble_form(
+                pump_expr * inner(u, v) * dx,
+                system.bcs,
+                diag=0.0,
+                mat=nevp_inputs.Q,
+                name="Q-update",
+            )
+        modes = algorithms.get_nevp_modes(nevp_inputs)
+        evals = np.asarray([mode.k for mode in modes])
+        assert evals.size
+
+        for midx in range(len(modes)):
+            init_mode(midx)
 
     aevals = []
     results = []  # list of (pump, intensity, fine-intensity) triples
@@ -672,19 +717,41 @@ def test_fig5_intens(system, infra):
                     name="Q-update",
                 )
 
-            with tracer.span("solve NEVP"):
-                modes = algorithms.get_nevp_modes(nevp_inputs)
-            evals = np.asarray([mode.k for mode in modes])
-            assert evals.size
+            use_newton = True
+            if use_newton:
+                with tracer.span("update NEVP modes"):
+                    cur_modes = []
+                    evals = []
+                    for midx in range(len(modes)):
+                        init_x: NonLasingInitialX = nl_newton_operators.initial_x_seq[
+                            midx
+                        ]
+                        with tracer.span(f"update NEVP mode {midx}"):
+                            new_nlm = algorithms.newton(
+                                nllp,
+                                nl_newton_operators.L,
+                                nl_newton_operators.A,
+                                init_x.vec,
+                                nl_newton_operators.delta_x,
+                                nl_newton_operators.solver,
+                                init_x.dof_at_maximum,
+                                init_x.bcs,
+                            )
+                        cur_modes.append(new_nlm)
+                        evals.append(new_nlm.k)
+                    evals = np.asarray(evals)
+            else:
+                with tracer.span("solve NEVP"):
+                    cur_modes = algorithms.get_nevp_modes(nevp_inputs)
 
             if False:
                 plot_ciss_eigenvalues(
                     evals, params=system.rg_params, kagt=(system.ka, system.gt)
                 )
 
-            with tracer.span("constant pump algorithm"):
+            with tracer.span(f"constant pump algorithm {pump=}"):
                 multi_modes = algorithms.constant_pump_algorithm(
-                    modes,
+                    cur_modes,
                     nevp_inputs,
                     nlp,
                     newton_operators,
