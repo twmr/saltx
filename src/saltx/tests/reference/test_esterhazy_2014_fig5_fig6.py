@@ -721,7 +721,6 @@ def test_fig5_intens(system, infra):
             if use_newton:
                 with tracer.span("update NEVP modes"):
                     cur_modes = []
-                    evals = []
                     for midx in range(len(modes)):
                         init_x: NonLasingInitialX = nl_newton_operators.initial_x_seq[
                             midx
@@ -738,11 +737,11 @@ def test_fig5_intens(system, infra):
                                 init_x.bcs,
                             )
                         cur_modes.append(new_nlm)
-                        evals.append(new_nlm.k)
-                    evals = np.asarray(evals)
             else:
                 with tracer.span("solve NEVP"):
                     cur_modes = algorithms.get_nevp_modes(nevp_inputs)
+            evals = np.asarray([mode.k for mode in cur_modes])
+            assert evals.size
 
             if False:
                 plot_ciss_eigenvalues(
