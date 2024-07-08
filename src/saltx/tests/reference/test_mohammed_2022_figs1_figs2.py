@@ -159,7 +159,7 @@ def calculate_mode_and_intensity(
     return fac, intens, first_mode.s
 
 
-def test_single_mode_pump_trajectory_D1_0p85(mohammed_system):
+def test_single_mode_pump_trajectory_D1_0p85(mohammed_system, infra):
     system = mohammed_system
     fixed_D1 = 0.85
     fac, intens, s = calculate_mode_and_intensity(system, fixed_D1, 0.2 * fixed_D1, 0.1)
@@ -208,10 +208,12 @@ def test_single_mode_pump_trajectory_D1_0p85(mohammed_system):
     ax2.axvline(x=D2D1_turnon)
     ax2.legend()
 
+    infra.save_plot(fig, name="d1_0p85")
+
     plt.show()
 
 
-def test_single_mode_pump_trajectory_D1_0p95(mohammed_system):
+def test_single_mode_pump_trajectory_D1_0p95(mohammed_system, infra):
     system = mohammed_system
     fixed_D1 = 0.95
     fac, intens, s = calculate_mode_and_intensity(
@@ -271,6 +273,8 @@ def test_single_mode_pump_trajectory_D1_0p95(mohammed_system):
     ax2.set_ylabel("f*a/c")
     ax2.legend()
 
+    infra.save_plot(fig, name="d1_0p95")
+
     plt.show()
 
 
@@ -319,7 +323,7 @@ def _refine_first_mode_and_calculate_nevp_again(
 
 
 @pytest.mark.skip(reason="Too slow for the CI")
-def test_eval_traj_D1_0p85(mohammed_system):
+def test_eval_traj_D1_0p85(mohammed_system, infra):
     system = mohammed_system
     u = ufl.TrialFunction(system.V)
     v = ufl.TestFunction(system.V)
@@ -428,7 +432,7 @@ def test_eval_traj_D1_0p85(mohammed_system):
     ax.plot(all_rm_d0vals, [x[0].imag for x in all_rm_evals], "x")
     ax.plot(all_rm_d0vals, [x[1].imag for x in all_rm_evals], "x")
 
-    ax.set_title("Imag part of k vs D1/D2")
+    ax.set_title("Imag part of k vs D2/D1")
     ax.grid(True)
     ax.set_xlabel("D2/D1")
 
@@ -444,9 +448,11 @@ def test_eval_traj_D1_0p85(mohammed_system):
     ax.plot(all_rm_d0vals, [x[0].real for x in all_rm_evals], "x")
     ax.plot(all_rm_d0vals, [x[1].real for x in all_rm_evals], "x")
 
-    ax.set_title("Real part of k vs D1/D2")
+    ax.set_title("Real part of k vs D2/D1")
     ax.grid(True)
     ax.set_xlabel("D2/D1")
+
+    infra.save_plot(fig, name="evaltraj")
 
     fig, ax = plt.subplots()
     ax.plot(rdm.figs2a_data[:, 0], rdm.figs2a_data[:, 1], "x", label="paper reference")
@@ -456,7 +462,9 @@ def test_eval_traj_D1_0p85(mohammed_system):
     )
     ax.grid(True)
     ax.set_xlabel("D2/D1")
-    ax.set_xlabel("Intens of THE first lasermode")
+    ax.set_title("Intens of THE first lasermode")
     ax.legend()
+
+    infra.save_plot(fig, name="intensity")
 
     plt.show()
