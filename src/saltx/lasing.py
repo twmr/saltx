@@ -35,15 +35,15 @@ class MatVecCollection(NamedTuple):
 class NonLinearProblem:
     def __init__(
         self,
-        V,
-        ka,
-        gt,
+        V: fem.FunctionSpace,
+        ka: float,
+        gt: float,
         dielec: float | fem.Function,
         n: int,
-        pump,
+        pump,  # ufl.core.expr.Expr, ....?
         invperm: fem.Function | None = None,
         ds_obc=None,  # only needed for 1D
-        max_nmodes=5,
+        max_nmodes: int = 5,
     ):
         self.V = V
         self.Ws = [V.clone() for _ in range(max_nmodes * 2)]
