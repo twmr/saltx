@@ -56,16 +56,30 @@ platforms = ["linux-64"]
 [tool.pixi.pypi-dependencies]
 saltx = { path = ".", editable = true }
 
-[tool.pixi.tasks]
-
 [tool.pixi.dependencies]
+python = "3.12.*"
 fenics-dolfinx = "0.7.3.*"
 mpi4py = ">=3.1.6,<4"  # pinning required, because dolfinx=0.7.3 is not compatible with mpi4py 4.0
-pytest = ">=8.1.1,<8.2"
-matplotlib = ">=3.9.1,<4"
+
+matplotlib-base = ">=3.9.1,<4"
 pandas = ">=2.2.2,<3"
 scipy = ">=1.14.0,<2"
 petsc = { version = "==3.20.6", build = "complex_*" }
-python = "3.12.*"
-ipython = ">=8.26.0,<9"
-ruff = ">=0.5.5,<0.6"
+
+[tool.pixi.feature.test.dependencies]
+pytest = ">=8.1.1,<8.2"
+[tool.pixi.feature.test.tasks]
+# In the `test` env this only works when `--hide-plots` is passed to
+# the command line, because matplotlib-base is installed in this env.
+# matplotlib-base + dolfinx seem to lead to segfaults, unless the
+# non-interactive `agg` backend is used.
+test = "pytest"
+
+[tool.pixi.feature.dev.dependencies]
+ipython = "*"
+matplotlib = ">=3.9.1,<4"
+
+[tool.pixi.environments]
+default = {features = [], solve-group = "default"}
+test = {features = ["test"], solve-group = "default"}
+dev = {features = ["dev", "test"], solve-group = "default"}
