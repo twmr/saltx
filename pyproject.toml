@@ -69,10 +69,12 @@ petsc = { version = "==3.20.6", build = "complex_*" }
 [tool.pixi.feature.test.dependencies]
 pytest = ">=8.1.1,<8.2"
 [tool.pixi.feature.test.tasks]
-# In the `test` env this only works when `--hide-plots` is passed to
-# the command line, because matplotlib-base is installed in this env.
-# matplotlib-base + dolfinx seem to lead to segfaults, unless the
-# non-interactive `agg` backend is used.
+# In the `test` env this only works when `--hide-plots` is passed on
+# the command line, because then the mpl backend is set to 'agg'. If
+# the backend is set to `tkagg` (default when `matplotlib-base` is
+# installed) then a segfault is raised when `dolfinx` was imported.
+# TODO set MPLBACKEND to agg when run the `test` pixi task is run
+# inside the `test` env.
 test = "pytest"
 
 [tool.pixi.feature.dev.dependencies]
