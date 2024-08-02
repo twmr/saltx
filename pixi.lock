@@ -3951,7 +3951,7 @@ packages:
   name: saltx
   version: 0.1.0
   path: .
-  sha256: 607a793ac9e0a8b74882d6a019140a0c918f0cb30bd861fad96a48c0dadeeb22
+  sha256: 6284abf06ab23e2a96385f6adfc56c84c120698badffbc577555a65f3f990fc8
   requires_python: '>=3.10'
   editable: true
 - kind: conda
