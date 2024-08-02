@@ -153,7 +153,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/mpfr-4.2.1-h38ae2d0_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/mpg123-1.32.6-h59595ed_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/mpi-1.0-mpich.tar.bz2
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/mpi4py-4.0.0-py312h5924d30_1.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/mpi4py-3.1.6-py312h60e9011_1.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/mpich-4.2.2-h4a7f18d_101.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/mumps-include-5.6.2-ha770c72_4.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/mumps-mpi-5.6.2-h416f8d4_4.conda
@@ -2931,25 +2931,24 @@ packages:
   size: 4184
 - kind: conda
   name: mpi4py
-  version: 4.0.0
-  build: py312h5924d30_1
+  version: 3.1.6
+  build: py312h60e9011_1
   build_number: 1
   subdir: linux-64
-  url: https://conda.anaconda.org/conda-forge/linux-64/mpi4py-4.0.0-py312h5924d30_1.conda
-  sha256: 1ae987550300ec1e59c795ab3be587fa99ca5adf6a28dc75037f5b102a102f0f
-  md5: ed5dfc59ba9c5a37910b7ab337a00917
+  url: https://conda.anaconda.org/conda-forge/linux-64/mpi4py-3.1.6-py312h60e9011_1.conda
+  sha256: e059e81af0f2925e80ee04998641ba57124d667a0336bfc892d34935b4bdbfa3
+  md5: 53d66537c3fdb11cad7283fed3439b20
   depends:
-  - __glibc >=2.17,<3.0.a0
   - libgcc-ng >=12
-  - mpich >=4.2.2,<5.0a0
+  - mpich >=4.2.1,<5.0a0
   - python >=3.12,<3.13.0a0
   - python_abi 3.12.* *_cp312
-  license: BSD-3-Clause
+  license: BSD-2-Clause
   license_family: BSD
   purls:
   - pkg:pypi/mpi4py?source=conda-forge-mapping
-  size: 848600
-  timestamp: 1722365427987
+  size: 566319
+  timestamp: 1716628398876
 - kind: conda
   name: mpich
   version: 4.2.2
@@ -3951,7 +3950,7 @@ packages:
   name: saltx
   version: 0.1.0
   path: .
-  sha256: 6284abf06ab23e2a96385f6adfc56c84c120698badffbc577555a65f3f990fc8
+  sha256: ed423f94c3052d0e28ec505c79d3ebd4b9df82d45c8a99d06899ca39d24981f1
   requires_python: '>=3.10'
   editable: true
 - kind: conda

@@ -60,6 +60,7 @@ saltx = { path = ".", editable = true }
 
 [tool.pixi.dependencies]
 fenics-dolfinx = "0.7.3.*"
+mpi4py = ">=3.1.6,<4"  # pinning required, because dolfinx=0.7.3 is not compatible with mpi4py 4.0
 pytest = ">=8.1.1,<8.2"
 matplotlib = ">=3.9.1,<4"
 pandas = ">=2.2.2,<3"
