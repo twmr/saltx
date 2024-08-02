@@ -61,10 +61,10 @@ saltx = { path = ".", editable = true }
 [tool.pixi.dependencies]
 fenics-dolfinx = "0.7.3.*"
 pytest = ">=8.1.1,<8.2"
-matplotlib = ">=3.8.4,<3.9"
-pandas = ">=2.2.2,<2.3"
-scipy = ">=1.13.0,<1.14"
+matplotlib = ">=3.9.1,<4"
+pandas = ">=2.2.2,<3"
+scipy = ">=1.14.0,<2"
 petsc = { version = "==3.20.6", build = "complex_*" }
 python = "3.12.*"
-ipython = ">=8.22.2,<8.23"
-ruff = ">=0.4.4,<0.5"
+ipython = ">=8.26.0,<9"
+ruff = ">=0.5.5,<0.6"
