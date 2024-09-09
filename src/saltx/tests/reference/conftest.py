@@ -15,7 +15,7 @@ from saltx import algorithms
 from saltx.mesh import create_combined_interval_mesh, create_dcells
 
 
-@pytest.fixture()
+@pytest.fixture
 def mohammed_system():
     a = 1.0
     n_cav = 3.0

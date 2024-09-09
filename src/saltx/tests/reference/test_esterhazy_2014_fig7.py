@@ -127,7 +127,7 @@ def map_function_to_circle_mesh(
     return circle_mode
 
 
-@pytest.fixture()
+@pytest.fixture
 def system():
     ka = 4.83
     gt = 1.00
@@ -218,7 +218,7 @@ def system():
     return namedtuple("System", list(fixture_locals.keys()))(**fixture_locals)
 
 
-@pytest.fixture()
+@pytest.fixture
 def system_quarter():
     ka = 4.83
     gt = 1.00

@@ -36,7 +36,7 @@ def real_const(V, real_value: float) -> fem.Constant:
     return fem.Constant(V.mesh, complex(real_value, 0))
 
 
-@pytest.fixture()
+@pytest.fixture
 def system():
     pump_profile = 1.0
     dielec = 1.01**2

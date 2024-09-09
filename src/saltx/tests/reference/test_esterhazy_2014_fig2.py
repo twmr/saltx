@@ -63,7 +63,7 @@ def determine_meshtags_for_1d(msh):
     return meshtags(msh, msh.topology.dim - 1, indices, values[pos])
 
 
-@pytest.fixture()
+@pytest.fixture
 def system(bc_type):
     dielec = 1.2**2
     pump_profile = 1.0

@@ -42,7 +42,7 @@ def real_const(V, real_value: float) -> fem.Constant:
     return fem.Constant(V.mesh, complex(real_value, 0))
 
 
-@pytest.fixture()
+@pytest.fixture
 def system():
     use_pml = False
     if not use_pml:
@@ -285,7 +285,7 @@ def calc_logdetT(k: complex) -> float:
     return np.log(np.abs(np.linalg.det(T)))
 
 
-@pytest.mark.xfail()
+@pytest.mark.xfail
 def test_nopump():
     """Tests if the complex eigenvalues at d=0 (no pump) match the one in the
     paper.

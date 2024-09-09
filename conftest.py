@@ -56,7 +56,7 @@ class _Infra:
         fig.savefig(fname)
 
 
-@pytest.fixture()
+@pytest.fixture
 def infra(request):
 
     return _Infra(request.node)
