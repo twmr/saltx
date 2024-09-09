@@ -519,7 +519,7 @@ def test_multimode_solve(D0, bc_type, system):
         diag=0.0,
         name="Q",
     )
-    R = assemble_form(inner(u, v) * system.ds_obc, system.bcs, diag=0.0, mame="R")
+    R = assemble_form(inner(u, v) * system.ds_obc, system.bcs, diag=0.0, name="R")
 
     nevp_inputs = algorithms.NEVPInputs(
         ka=system.ka,

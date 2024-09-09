@@ -611,7 +611,7 @@ def test_solve(system):
             plt.show()
 
 
-def test_twomodes(system):
+def test_twomodes(system, infra):
     # laser mode test of a system, where two modes are active
     system = system._replace(D0=0.05, epsc=(2.0 + 0.01j) ** 2)
     system.dielec.x.array[system.cav_dofs] = np.full_like(
@@ -663,7 +663,11 @@ def test_twomodes(system):
 
     modes = algorithms.get_nevp_modes(nevp_inputs)
     evals = np.asarray([mode.k for mode in modes])
-    plot_ciss_eigenvalues(evals, params=system.rg_params, kagt=(system.ka, system.gt))
+
+    _, ax = plt.subplots()
+    plot_ciss_eigenvalues(
+        ax, evals, params=system.rg_params, kagt=(system.ka, system.gt)
+    )
 
     assert modes[evals.imag.argmax()].k.imag > 0
 
