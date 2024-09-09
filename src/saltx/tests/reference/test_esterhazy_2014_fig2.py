@@ -131,7 +131,7 @@ def system(bc_type):
 
 @pytest.mark.parametrize("bc_type", [BCType.DBC])
 @pytest.mark.parametrize("first_threshold", [True, False])
-def test_eval_traj(bc_type, system, first_threshold):
+def test_eval_traj(bc_type, system, infra, first_threshold):
     """Plot the eigenvalues as a function of D0."""
     refine_first_mode = True
     if first_threshold:
@@ -152,9 +152,9 @@ def test_eval_traj(bc_type, system, first_threshold):
     D0_constant = real_const(system.V, 1.0)
 
     log.info("Before first assembly")
-    L = assemble_form(-inner(nabla_grad(u), nabla_grad(v)) * dx, system.bcs)
-    M = assemble_form(system.dielec * inner(u, v) * dx, system.bcs, diag=0.0)
-    R = assemble_form(inner(u, v) * system.ds_obc, system.bcs, diag=0.0)
+    L = assemble_form(-inner(nabla_grad(u), nabla_grad(v)) * dx, system.bcs, name="L")
+    M = assemble_form(system.dielec * inner(u, v) * dx, system.bcs, diag=0.0, name="M")
+    R = assemble_form(inner(u, v) * system.ds_obc, system.bcs, diag=0.0, name="R")
     Q_form = fem.form(D0_constant * system.pump_profile * inner(u, v) * dx)
     Q = create_matrix(Q_form)
     nevp_inputs = algorithms.NEVPInputs(
@@ -188,7 +188,7 @@ def test_eval_traj(bc_type, system, first_threshold):
     for D0 in D0range:
         log.info(f" {D0=} ".center(80, "#"))
         D0_constant.value = D0
-        assemble_form(Q_form, system.bcs, diag=0.0, mat=nevp_inputs.Q)
+        assemble_form(Q_form, system.bcs, diag=0.0, mat=nevp_inputs.Q, name="Q-update")
 
         modes = algorithms.get_nevp_modes(nevp_inputs)
         evals = np.asarray([mode.k for mode in modes])
@@ -224,7 +224,11 @@ def test_eval_traj(bc_type, system, first_threshold):
             # term.
             nlp.update_b_and_k_for_forms([refined_mode])
             assemble_form(
-                nlp.get_Q_hbt_form(nmodes=1), system.bcs, diag=0.0, mat=nevp_inputs.Q
+                nlp.get_Q_hbt_form(nmodes=1),
+                system.bcs,
+                diag=0.0,
+                mat=nevp_inputs.Q,
+                name="Q-SHT",
             )
 
             sht_modes = algorithms.get_nevp_modes(nevp_inputs)
@@ -274,14 +278,18 @@ def test_eval_traj(bc_type, system, first_threshold):
 
         ax.grid(True)
 
-    scatter_plot(vals, "Non-Interacting thresholds")
+        return fig
+
+    fig = scatter_plot(vals, "Non-Interacting thresholds")
+    infra.save_plot(fig)
 
     # TODO spline the trajectories and then find the root
 
     if refine_first_mode:
-        scatter_plot(
+        fig = scatter_plot(
             vals_after_refine, "Thresholds when mode around k.real~11 is refined"
         )
+        infra.save_plot(fig, name="refined")
 
     plt.show()
 
@@ -303,12 +311,15 @@ def test_solve(D0, bc_type, system):
     v = ufl.TestFunction(system.V)
     D0_constant = real_const(system.V, D0)
 
-    L = assemble_form(-inner(nabla_grad(u), nabla_grad(v)) * dx, system.bcs)
-    M = assemble_form(system.dielec * inner(u, v) * dx, system.bcs, diag=0.0)
+    L = assemble_form(-inner(nabla_grad(u), nabla_grad(v)) * dx, system.bcs, name="L")
+    M = assemble_form(system.dielec * inner(u, v) * dx, system.bcs, diag=0.0, name="M")
     Q = assemble_form(
-        D0_constant * system.pump_profile * inner(u, v) * dx, system.bcs, diag=0.0
+        D0_constant * system.pump_profile * inner(u, v) * dx,
+        system.bcs,
+        diag=0.0,
+        name="Q",
     )
-    R = assemble_form(inner(u, v) * system.ds_obc, system.bcs, diag=0.0)
+    R = assemble_form(inner(u, v) * system.ds_obc, system.bcs, diag=0.0, name="R")
 
     nevp_inputs = algorithms.NEVPInputs(
         ka=system.ka,
@@ -508,12 +519,15 @@ def test_multimode_solve(D0, bc_type, system):
 
     D0_constant = real_const(system.V, D0)
 
-    L = assemble_form(-inner(nabla_grad(u), nabla_grad(v)) * dx, system.bcs)
-    M = assemble_form(system.dielec * inner(u, v) * dx, system.bcs, diag=0.0)
+    L = assemble_form(-inner(nabla_grad(u), nabla_grad(v)) * dx, system.bcs, name="L")
+    M = assemble_form(system.dielec * inner(u, v) * dx, system.bcs, diag=0.0, name="M")
     Q = assemble_form(
-        D0_constant * system.pump_profile * inner(u, v) * dx, system.bcs, diag=0.0
+        D0_constant * system.pump_profile * inner(u, v) * dx,
+        system.bcs,
+        diag=0.0,
+        name="Q",
     )
-    R = assemble_form(inner(u, v) * system.ds_obc, system.bcs, diag=0.0)
+    R = assemble_form(inner(u, v) * system.ds_obc, system.bcs, diag=0.0, mame="R")
 
     nevp_inputs = algorithms.NEVPInputs(
         ka=system.ka,
@@ -590,12 +604,15 @@ def test_intensity_vs_pump_esterhazy(bc_type, D0range, system):
 
     D0_constant = real_const(system.V, 1.0)
 
-    L = assemble_form(-inner(nabla_grad(u), nabla_grad(v)) * dx, system.bcs)
-    M = assemble_form(system.dielec * inner(u, v) * dx, system.bcs, diag=0.0)
+    L = assemble_form(-inner(nabla_grad(u), nabla_grad(v)) * dx, system.bcs, name="L")
+    M = assemble_form(system.dielec * inner(u, v) * dx, system.bcs, diag=0.0, name="M")
     Q = assemble_form(
-        D0_constant * system.pump_profile * inner(u, v) * dx, system.bcs, diag=0.0
+        D0_constant * system.pump_profile * inner(u, v) * dx,
+        system.bcs,
+        diag=0.0,
+        name="Q",
     )
-    R = assemble_form(inner(u, v) * system.ds_obc, system.bcs, diag=0.0)
+    R = assemble_form(inner(u, v) * system.ds_obc, system.bcs, diag=0.0, name="R")
 
     Print(
         f"(complex-valued) NEVP: {L.getSize()=},  DOF: {L.getInfo()['nz_used']}, "
@@ -640,6 +657,7 @@ def test_intensity_vs_pump_esterhazy(bc_type, D0range, system):
             system.bcs,
             diag=0.0,
             mat=nevp_inputs.Q,
+            name="Q-update",
         )
         modes = algorithms.get_nevp_modes(nevp_inputs)
         evals = np.asarray([mode.k for mode in modes])

@@ -14,7 +14,7 @@ log = logging.getLogger(__name__)
 
 def assemble_form(form, bcs, diag=1.0, mat=None, name=""):
     if isinstance(form, fem.forms.Form):
-        log.warning(f"fem.form {name} already created")
+        log.debug(f"fem.form {name} already created")
         fform = form
     else:
         with Timer(log.info, f"assemble_form {name}"):
