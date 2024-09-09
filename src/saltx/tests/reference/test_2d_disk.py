@@ -43,7 +43,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
+import polars as pl
 import pytest
 import scipy
 import ufl
@@ -296,8 +296,9 @@ def test_check_eigenvalues(system):
         # print(f"({m}, {k}, {quantum_l}),")
         results.append(logdet)
 
-    df = pd.DataFrame(results).T
-    df.columns = [f"k{i}" for i in range(1, len(all_slepc_evals_n1p2) + 1)]
+    df = pl.DataFrame(
+        results, schema=[f"k{i}" for i in range(1, len(all_slepc_evals_n1p2) + 1)]
+    )
     # the rows correspond to l
 
     print(df)

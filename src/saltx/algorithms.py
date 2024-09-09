@@ -11,7 +11,7 @@ import time
 import typing
 
 import numpy as np
-import pandas as pd
+import polars as pl
 from dolfinx import fem, geometry
 from dolfinx.fem import DirichletBC
 from petsc4py import PETSc
@@ -53,7 +53,7 @@ class NEVPNonLasingModeRealK:  # The newton modes (above the threshold)
     dof_at_maximum: int
     # TODO introduce a pump_parameter instead of D0
     # D0: float
-    newton_info_df: pd.DataFrame
+    newton_info_df: pl.DataFrame
     newton_deltax_norm: float
     newton_error: float
     setup_time: float
@@ -406,13 +406,14 @@ def _refine_modes(
         f"Initial k: {[mi.k for mi in modeinfos]}, s: {[mi.s for mi in modeinfos]} "
         f"{relaxation_parameter=}"
     )
-    newton_df = pd.DataFrame(
+    newton_df = pl.DataFrame(
         newton_steps,
-        columns=(
+        schema=(
             [f"k{i}" for i in range(nmodes)]
             + [f"s{i}" for i in range(nmodes)]
             + ["corrnorm", "dt"]
         ),
+        orient="row",
     )
     Print(newton_df)
 
@@ -600,7 +601,7 @@ def newton(
         raise RuntimeError("mode didn't converge")
 
     # Print(f"Initial k: {mode.k} ...")
-    df = pd.DataFrame(newton_steps, columns=["k", "corrnorm", "dt"])
+    df = pl.DataFrame(newton_steps, schema=["k", "corrnorm", "dt"], orient="row")
     Print(df)
 
     new_mode = initial_x.getArray().copy()[:-1]  # remove the k

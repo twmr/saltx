@@ -62,9 +62,9 @@ fenics-dolfinx = "0.7.3.*"
 mpi4py = ">=3.1.6,<4"  # pinning required, because dolfinx=0.7.3 is not compatible with mpi4py 4.0
 
 matplotlib-base = ">=3.9.1,<4"
-pandas = ">=2.2.2,<3"
 scipy = ">=1.14.0,<2"
 petsc = { version = "==3.20.6", build = "complex_*" }
+polars = ">=1.6.0,<2"
 
 [tool.pixi.feature.test.dependencies]
 pytest = ">=8.1.1,<8.2"
