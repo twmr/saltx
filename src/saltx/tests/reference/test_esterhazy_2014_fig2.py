@@ -598,7 +598,7 @@ def test_multimode_solve(D0, bc_type, system):
         "NBCsinglemoes",
     ],
 )
-def test_intensity_vs_pump_esterhazy(bc_type, D0range, system):
+def test_intensity_vs_pump_esterhazy(bc_type, D0range, system, infra):
     u = ufl.TrialFunction(system.V)
     v = ufl.TestFunction(system.V)
 
@@ -784,9 +784,12 @@ def test_intensity_vs_pump_esterhazy(bc_type, D0range, system):
     # TODO the threshold for NBC modes is not correct
     ax.axvline(x=0.26674748)
     ax.grid(True)
+    infra.save_plot(fig, name="intensity")
 
+    fig, ax = plt.subplots()
     plot_ciss_eigenvalues(
-        np.concatenate(aevals), params=system.rg_params, kagt=(system.ka, system.gt)
+        ax, np.concatenate(aevals), params=system.rg_params, kagt=(system.ka, system.gt)
     )
+    infra.save_plot(fig, name="evals")
 
     plt.show()

@@ -461,7 +461,7 @@ def test_solve(D0, system):
             Print(f"-> {mode_intensity=}")
 
 
-def test_intensity_vs_pump(system):
+def test_intensity_vs_pump(system, infra):
     # figure 6
     u = ufl.TrialFunction(system.V)
     v = ufl.TestFunction(system.V)
@@ -611,7 +611,7 @@ def test_intensity_vs_pump(system):
                 results.append((D0, mode.k.real, mode_intensity.sum()))
             aevals.append(multi_evals)
 
-    _, ax = plt.subplots()
+    fig, ax = plt.subplots()
 
     # we have to scale (in y) the intensities from the generalizations paper due to the
     # different definitions of the intensities.
@@ -629,8 +629,9 @@ def test_intensity_vs_pump(system):
     ax.axvline(x=FIRST_THRESHOLD)
     ax.legend()
     ax.grid(True)
+    infra.save_plot(fig, name="modalintensity")
 
-    _, axes = plt.subplots(nrows=2, sharex=True)
+    fig, axes = plt.subplots(nrows=2, sharex=True)
     y = np.asarray([k_real for (_, k_real, _) in results])
     k_separation = 16.0
 
@@ -653,8 +654,12 @@ def test_intensity_vs_pump(system):
     axes[1].set_xlabel("Pump D0")
     axes[1].set_ylabel("k.real")
 
+    infra.save_plot(fig, name="kvsD0")
+
+    fig, ax = plt.subplots()
     plot_ciss_eigenvalues(
-        np.concatenate(aevals), params=system.rg_params, kagt=(system.ka, system.gt)
+        ax, np.concatenate(aevals), params=system.rg_params, kagt=(system.ka, system.gt)
     )
+    infra.save_plot(fig, name="eigenvalues")
 
     plt.show()

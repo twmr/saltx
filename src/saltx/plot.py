@@ -4,14 +4,14 @@
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
-import matplotlib.pyplot as plt
+import matplotlib.axes
 import numpy as np
 import ufl.tensors
 from dolfinx.plot import vtk_mesh
 from matplotlib.patches import Ellipse
 
 
-def plot_ellipse(ax, params):
+def plot_ellipse(ax: matplotlib.axes.Axes, params) -> None:
     if params is None:
         return
 
@@ -27,26 +27,41 @@ def plot_ellipse(ax, params):
         edgecolor="r",
         fc="None",
         lw=2,
+        label="CISS contour",
     )
     ax.add_patch(ellipse)
 
 
 def plot_ciss_eigenvalues(
+    ax: matplotlib.axes.Axes,
     lambdas: np.ndarray,
     params: tuple | None = None,
     kagt: tuple[float, float] | None = None,
 ) -> None:
-    fig, ax = plt.subplots()
-
-    ax.plot(np.real(lambdas), np.imag(lambdas), "x")
+    ax.plot(np.real(lambdas), np.imag(lambdas), "x", label="eigenvalues")
 
     plot_ellipse(ax, params)
 
     if kagt is not None:
         ka, gt = kagt
+
+        ax.text(
+            0.02,
+            0.98,
+            f"{ka=}, {gt=}",
+            color="k",
+            ha="left",
+            va="top",
+            rotation=0,
+            transform=ax.transAxes,
+        )
+
         ax.plot(ka, -gt, "ro", label="singularity")
+
+    ax.set_xlabel("k.real")
+    ax.set_ylabel("k.imag")
     ax.grid(True)
-    plt.show()
+    ax.legend()
 
 
 def plot_meshfunctions(msh, pump_profile, dielec, invperm):

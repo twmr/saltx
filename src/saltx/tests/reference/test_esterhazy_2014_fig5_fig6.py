@@ -744,8 +744,9 @@ def test_fig5_intens(system, infra):
             assert evals.size
 
             if False:
+                _, ax = plt.subplots()
                 plot_ciss_eigenvalues(
-                    evals, params=system.rg_params, kagt=(system.ka, system.gt)
+                    ax, evals, params=system.rg_params, kagt=(system.ka, system.gt)
                 )
 
             with tracer.span(f"constant pump algorithm {pump=}"):
@@ -825,8 +826,10 @@ def test_fig5_intens(system, infra):
         ax.grid(True)
         infra.save_plot(fig, name="modalintens")
 
+    fig, ax = plt.subplots()
     plot_ciss_eigenvalues(
-        np.concatenate(aevals), params=system.rg_params, kagt=(system.ka, system.gt)
+        ax, np.concatenate(aevals), params=system.rg_params, kagt=(system.ka, system.gt)
     )
+    infra.save_plot(fig)
 
     plt.show()
