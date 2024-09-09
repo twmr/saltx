@@ -57,7 +57,11 @@ from saltx import algorithms, newtils, nonlasing
 from saltx.assemble import assemble_form
 from saltx.lasing import NonLinearProblem
 from saltx.nonlasing import NonLasingLinearProblem
-from saltx.plot import plot_ciss_eigenvalues, plot_ellipse, plot_meshfunctions
+from saltx.plot import (
+    plot_ciss_eigenvalues,
+    plot_meshfunctions,
+    plot_parametrized_ciss_eigenvalues,
+)
 from saltx.pml import RectPML
 
 repo_dir = Path(__file__).parent.parent.parent.parent.parent
@@ -317,7 +321,7 @@ def test_check_eigenvalues(system):
     assert value_counts[0] == 4
 
 
-def test_eval_traj(system):
+def test_eval_traj(system, infra):
     assert system.is_quarter_circle
 
     # If set to True, determine one mode for a set of pump strengths D0 (D0range) using
@@ -450,30 +454,14 @@ def test_eval_traj(system):
         f"{t_total:.1f}s (avg per iteration: {t_total/D0range.size:.3f}s)"
     )
 
-    def scatter_plot(vals, title):
-        fig, ax = plt.subplots()
-        fig.suptitle(title)
+    fig, ax = plt.subplots()
+    fig.suptitle("Non-Interacting thresholds")
+    plot_parametrized_ciss_eigenvalues(
+        ax, np.vstack(vals), parametername="D0", rg_params=system.rg_params
+    )
 
-        merged = np.vstack(vals)
-        X, Y, C = (
-            merged[:, 1].real,
-            merged[:, 1].imag,
-            merged[:, 0].real,
-        )
-        norm = plt.Normalize(C.min(), C.max())
+    infra.save_plot(fig)
 
-        sc = ax.scatter(X, Y, c=C, norm=norm)
-        ax.set_xlabel("k.real")
-        ax.set_ylabel("k.imag")
-
-        cbar = fig.colorbar(sc, ax=ax)
-        cbar.set_label("D0", loc="top")
-
-        plot_ellipse(ax, system.rg_params)
-
-        ax.grid(True)
-
-    scatter_plot(vals, "Non-Interacting thresholds")
     plt.show()
 
 

@@ -26,7 +26,7 @@ from ufl import dx, inner, nabla_grad
 from saltx import algorithms, newtils
 from saltx.assemble import assemble_form
 from saltx.lasing import NonLinearProblem
-from saltx.plot import plot_ciss_eigenvalues
+from saltx.plot import plot_ciss_eigenvalues, plot_parametrized_ciss_eigenvalues
 
 log = logging.getLogger(__name__)
 
@@ -257,37 +257,29 @@ def test_eval_traj(bc_type, system, infra, first_threshold):
         assert vals[-4][modeidx, 1].real == pytest.approx(11.533018)
         assert abs(vals[-4][modeidx, 1].imag) < 3e-4
 
-    def scatter_plot(vals, title):
-        fig, ax = plt.subplots()
-        fig.suptitle(title)
+    fig, ax = plt.subplots()
+    fig.suptitle("Non-Interacting thresholds")
 
-        merged = np.vstack(vals)
-        X, Y, C = (
-            merged[:, 1].real,
-            merged[:, 1].imag,
-            merged[:, 0].real,
-        )
-        norm = plt.Normalize(C.min(), C.max())
-
-        sc = ax.scatter(X, Y, c=C, norm=norm)
-        ax.set_xlabel("k.real")
-        ax.set_ylabel("k.imag")
-
-        cbar = fig.colorbar(sc, ax=ax)
-        cbar.set_label("D0", loc="top")
-
-        ax.grid(True)
-
-        return fig
-
-    fig = scatter_plot(vals, "Non-Interacting thresholds")
+    plot_parametrized_ciss_eigenvalues(
+        ax,
+        np.vstack(vals),
+        parametername="D0",
+        rg_params=system.rg_params,
+        # kagt=(system.ka, system.gt),
+    )
     infra.save_plot(fig)
 
     # TODO spline the trajectories and then find the root
 
     if refine_first_mode:
-        fig = scatter_plot(
-            vals_after_refine, "Thresholds when mode around k.real~11 is refined"
+        fig, ax = plt.subplots()
+        fig.suptitle("Thresholds when mode around k.real~11 is refined")
+        plot_parametrized_ciss_eigenvalues(
+            ax,
+            np.vstack(vals_after_refine),
+            parametername="D0",
+            rg_params=system.rg_params,
+            # kagt=(system.ka, system.gt),
         )
         infra.save_plot(fig, name="refined")
 

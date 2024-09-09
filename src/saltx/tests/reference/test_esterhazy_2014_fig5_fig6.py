@@ -29,7 +29,7 @@ from saltx.assemble import assemble_form
 from saltx.lasing import NonLinearProblem
 from saltx.mesh import create_combined_interval_mesh, create_dcells
 from saltx.nonlasing import NonLasingInitialX, NonLasingLinearProblem
-from saltx.plot import plot_ciss_eigenvalues, plot_ellipse
+from saltx.plot import plot_ciss_eigenvalues, plot_parametrized_ciss_eigenvalues
 from saltx.trace import tracer
 
 log = logging.getLogger(__name__)
@@ -490,34 +490,17 @@ def test_evaltraj(system, infra):
         f"{t_total:.1f}s (avg per iteration: {t_total/pump_range.size:.3f}s)",
     )
 
-    def scatter_plot(vals, title):
-        fig, ax = plt.subplots()
-        fig.suptitle(title)
+    def add_cc_evals():
+        ax.plot([93.42, 95.86], [-5.142, -5.275], "rx", label="cold-cavity mode")
 
-        merged = np.vstack(vals)
-        X, Y, C = (
-            merged[:, 1].real,
-            merged[:, 1].imag,
-            merged[:, 0].real,
-        )
-        norm = plt.Normalize(C.min(), C.max())
-
-        sc = ax.scatter(X, Y, c=C, norm=norm, alpha=1.0, label="saltx")
+    def set_labels():
         ax.set_xlabel("Re(k) [mm^-1]")
         ax.set_ylabel("Im(k) [mm^-1]")
 
-        cbar = fig.colorbar(sc, ax=ax)
-        cbar.set_label("D0", loc="top")
-
-        plot_ellipse(ax, system.rg_params)
-        ka, gt = system.ka, system.gt
-        ax.plot(ka, -gt, "ro", label="singularity")
-        ax.plot([93.42, 95.86], [-5.142, -5.275], "rx", label="cold-cavity mode")
-
-        ax.grid(True)
-        return fig, ax
-
-    fig, ax = scatter_plot(
+    fig, ax = plt.subplots()
+    fig.suptitle("Non-Interacting thresholds")
+    plot_parametrized_ciss_eigenvalues(
+        ax,
         np.asarray(
             [
                 (D0, mode.k)
@@ -525,8 +508,13 @@ def test_evaltraj(system, infra):
                 for mode in modes
             ],
         ),
-        "Non-Interacting thresholds",
+        parametername="D0",
+        rg_params=system.rg_params,
+        kagt=(system.ka, system.gt),
     )
+    add_cc_evals()
+    set_labels()
+
     data = np.loadtxt(reference_test_dir / "esterhazy_ep_fig6_red.csv", delimiter=",")
     ax.plot(data[:, 0], data[:, 1], "ro", alpha=0.1, label="paper")
     data = np.loadtxt(reference_test_dir / "esterhazy_ep_fig6_blue.csv", delimiter=",")
@@ -537,7 +525,10 @@ def test_evaltraj(system, infra):
     ax.set_ylim([-6, 1])
     infra.save_plot(fig, name="full")
 
-    fig, ax = scatter_plot(
+    fig, ax = plt.subplots()
+    fig.suptitle("Non-Interacting thresholds")
+    plot_parametrized_ciss_eigenvalues(
+        ax,
         np.asarray(
             [
                 (D0, mode.k)
@@ -545,8 +536,11 @@ def test_evaltraj(system, infra):
                 for mode in modes
             ],
         ),
-        "Non-Interacting thresholds",
+        parametername="D0",
+        rg_params=system.rg_params,
+        kagt=(system.ka, system.gt),
     )
+    set_labels()
 
     data = np.loadtxt(
         reference_test_dir / "esterhazy_ep_fig6_red_zoomed.csv", delimiter=","

@@ -30,7 +30,11 @@ from ufl import curl, dx, elem_mult, inner
 from saltx import algorithms, newtils
 from saltx.assemble import assemble_form
 from saltx.lasing import NonLinearProblem
-from saltx.plot import plot_ellipse, plot_meshfunctions
+from saltx.plot import (
+    plot_ellipse,
+    plot_meshfunctions,
+    plot_parametrized_ciss_eigenvalues,
+)
 from saltx.pml import RectPML
 from saltx.trace import tracer
 
@@ -1115,7 +1119,7 @@ def test_plot_modeintensities():
     plt.show()
 
 
-def test_evaltraj(system, system_quarter):
+def test_evaltraj(system, system_quarter, infra):
     """Determine the complex eigenvalues of the modes without a hole burning
     term."""
 
@@ -1140,32 +1144,15 @@ def test_evaltraj(system, system_quarter):
         evals = np.asarray([m.k for m in modes])
         vals.append(np.vstack([D0 * np.ones(evals.shape), evals]).T)
 
-    def scatter_plot(vals, title):
-        fig, ax = plt.subplots()
-        fig.suptitle(title)
-
-        merged = np.vstack(vals)
-        X, Y, C = (
-            merged[:, 1].real,
-            merged[:, 1].imag,
-            merged[:, 0].real,
-        )
-        norm = plt.Normalize(C.min(), C.max())
-
-        sc = ax.scatter(X, Y, c=C, norm=norm)
-        ax.set_xlabel("k.real")
-        ax.set_ylabel("k.imag")
-
-        cbar = fig.colorbar(sc, ax=ax)
-        cbar.set_label("D0", loc="top")
-
-        plot_ellipse(ax, system_quarter.rg_params)
-        list(map(lambda x: ax.axvline(x=x), allK))
-
-        ax.grid(True)
-
-    scatter_plot(
-        vals, f"Non-Interacting thresholds (Range D0={D0_range[0]} .. {D0_range[-1]})"
+    fig, ax = plt.subplots()
+    fig.suptitle(
+        f"Non-Interacting thresholds (Range D0={D0_range[0]} .. {D0_range[-1]})"
     )
+    plot_parametrized_ciss_eigenvalues(
+        ax, np.vstack(vals), parametername="D0", rg_params=system_quarter.rg_params
+    )
+    list(map(lambda x: ax.axvline(x=x), allK))
+
+    infra.save_plot(fig)
 
     plt.show()

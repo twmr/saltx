@@ -73,7 +73,7 @@ from ufl import dx, inner, nabla_grad
 from saltx import algorithms, nonlasing
 from saltx.assemble import assemble_form
 from saltx.nonlasing import NonLasingInitialX, NonLasingLinearProblem
-from saltx.plot import plot_ellipse
+from saltx.plot import plot_parametrized_ciss_eigenvalues
 
 log = logging.getLogger(__name__)
 
@@ -237,41 +237,14 @@ def test_evaltraj(system, infra):
         f"{t_total:.1f}s (avg per iteration: {t_total/D0range.size:.3f}s)",
     )
 
-    def scatter_plot(vals, title):
-        fig, ax = plt.subplots()
-        fig.suptitle(title)
+    fig, ax = plt.subplots()
+    fig.suptitle("Non-Interacting thresholds")
 
-        merged = np.vstack(vals)
-        X, Y, C = (
-            merged[:, 1].real,
-            merged[:, 1].imag,
-            merged[:, 0].real,
-        )
-        norm = plt.Normalize(C.min(), C.max())
-
-        sc = ax.scatter(X, Y, c=C, norm=norm)
-        ax.set_xlabel("k.real")
-        ax.set_ylabel("k.imag")
-
-        cbar = fig.colorbar(sc, ax=ax)
-        cbar.set_label("D0", loc="top")
-
-        plot_ellipse(ax, rg_params)
-        ka, gt = system.ka, system.gt
-        ax.plot(ka, -gt, "ro", label="singularity"),
-
-        cold_cavity_k_real = np.array([29.05973205, 30.63052837])
-        cold_cavity_k_imag = np.array([-0.27465] * 2)
-
-        ax.plot(
-            cold_cavity_k_real, cold_cavity_k_imag, "rx", label="cold-cavity evals"
-        ),
-
-        ax.legend()
-        ax.grid(True)
-        return fig
-
-    fig = scatter_plot(
+    cold_cavity_k_real = np.array([29.05973205, 30.63052837])
+    cold_cavity_k_imag = np.array([-0.27465] * 2)
+    ax.plot(cold_cavity_k_real, cold_cavity_k_imag, "rx", label="cold-cavity evals")
+    plot_parametrized_ciss_eigenvalues(
+        ax,
         np.asarray(
             [
                 (D0, mode.k)
@@ -279,7 +252,9 @@ def test_evaltraj(system, infra):
                 for mode in modes
             ],
         ),
-        "Non-Interacting thresholds",
+        parametername="D0",
+        rg_params=rg_params,
+        kagt=(system.ka, system.gt),
     )
 
     infra.save_plot(fig)

@@ -8,6 +8,7 @@ import matplotlib.axes
 import numpy as np
 import ufl.tensors
 from dolfinx.plot import vtk_mesh
+from matplotlib.colors import Normalize as CNormalize
 from matplotlib.patches import Ellipse
 
 
@@ -41,6 +42,52 @@ def plot_ciss_eigenvalues(
     ax.plot(np.real(lambdas), np.imag(lambdas), "x", label="eigenvalues")
 
     plot_ellipse(ax, params)
+
+    if kagt is not None:
+        ka, gt = kagt
+
+        ax.text(
+            0.02,
+            0.98,
+            f"{ka=}, {gt=}",
+            color="k",
+            ha="left",
+            va="top",
+            rotation=0,
+            transform=ax.transAxes,
+        )
+
+        ax.plot(ka, -gt, "ro", label="singularity")
+
+    ax.set_xlabel("k.real")
+    ax.set_ylabel("k.imag")
+    ax.grid(True)
+    ax.legend()
+
+
+def plot_parametrized_ciss_eigenvalues(
+    ax: matplotlib.axes.Axes,
+    data: np.ndarray,
+    parametername: str,
+    rg_params: tuple | None = None,
+    kagt: tuple[float, float] | None = None,
+) -> None:
+
+    assert data.ndim == 2
+    assert data.shape[1] == 2
+
+    X, Y, C = (
+        data[:, 1].real,
+        data[:, 1].imag,
+        data[:, 0].real,
+    )
+    norm = CNormalize(C.min(), C.max())
+
+    sc = ax.scatter(X, Y, c=C, norm=norm, marker="x", label="eigenvalues")
+    cbar = ax.get_figure().colorbar(sc, ax=ax)
+    cbar.set_label(parametername, loc="top")
+
+    plot_ellipse(ax, rg_params)
 
     if kagt is not None:
         ka, gt = kagt
