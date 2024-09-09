@@ -255,9 +255,12 @@ def build_single_T_nonlinear(quantum_l, k, ka, gt, D0, nc):
     return np.log(np.abs(np.linalg.det(T)))
 
 
-def test_ref_ellipse(system):
+def test_ref_ellipse(system, infra):
     # check that all eigenvalues lie within the elliptical contour
-    plot_ciss_eigenvalues([k for _, k in all_slepc_evals_n1p2], system.rg_params)
+
+    fig, ax = plt.subplots()
+    plot_ciss_eigenvalues(ax, [k for _, k in all_slepc_evals_n1p2], system.rg_params)
+    infra.save_plot(fig)
 
 
 def test_check_eigenvalues(system):
