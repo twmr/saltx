@@ -770,6 +770,8 @@ def test_intensity_vs_pump_esterhazy(bc_type, D0range, system, infra):
             mode_intensity = abs(mode_values) ** 2
             Print(f"-> {mode_intensity=}")
             results.append((D0, mode_intensity))
+            # FIXME if there are multiple modes inside multi_modes, aevals contains
+            # duplicates
             aevals.append(evals)
 
     fig, ax = plt.subplots()
