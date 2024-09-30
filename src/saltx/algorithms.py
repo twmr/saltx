@@ -551,7 +551,7 @@ def newton(
     correction_norm_threshold: float = 1e-10,
 ):
     """Upon success, ``initial_x`` contains the mode and k."""
-    # TODO This newton algorithm is specific to the nonlasinglinerproblem. Try to
+    # TODO This newton algorithm is specific to the `NonLasingLinearProblem`. Try to
     # generalize it and use it also in refine_mode
 
     # TODO return a dataclass??
