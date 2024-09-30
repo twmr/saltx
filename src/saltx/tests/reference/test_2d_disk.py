@@ -668,6 +668,7 @@ def test_twomodes(system, infra):
     plot_ciss_eigenvalues(
         ax, evals, params=system.rg_params, kagt=(system.ka, system.gt)
     )
+    plt.show()
 
     assert modes[evals.imag.argmax()].k.imag > 0
 
