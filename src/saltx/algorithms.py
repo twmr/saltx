@@ -196,6 +196,14 @@ def get_nevp_modes(
     nep.setType(SLEPc.NEP.Type.CISS)
 
     RG = nep.getRG()
+    # SLEPC currently only supports ELLIPSE regions for the NEPCISS solver.
+    # It would be nice to have Polygon/Ring support in order to remove better exclude
+    # singularities from the region.
+    # RG.setType(SLEPc.RG.Type.RING)
+    # RG.setRingParameters(*nevp_inputs.rg_params)
+    # RG.setType(SLEPc.RG.Type.POLYGON)
+    # RG.setPolygonVertices(nevp_inputs.rg_params)
+
     RG.setType(SLEPc.RG.Type.ELLIPSE)
     Print(f"RG params: {nevp_inputs.rg_params}")
     RG.setEllipseParameters(*nevp_inputs.rg_params)
