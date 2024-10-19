@@ -66,10 +66,10 @@ def system():
     msh = create_combined_interval_mesh(xstart, domains)
     dcells = create_dcells(msh, xstart, domains)
 
-    dielec = fem.Function(fem.FunctionSpace(msh, ("DG", 0)))
-    invperm = fem.Function(fem.FunctionSpace(msh, ("DG", 0)))
-    pump_left = fem.Function(fem.FunctionSpace(msh, ("DG", 0)))
-    pump_right = fem.Function(fem.FunctionSpace(msh, ("DG", 0)))
+    dielec = fem.Function(fem.functionspace(msh, ("DG", 0)))
+    invperm = fem.Function(fem.functionspace(msh, ("DG", 0)))
+    pump_left = fem.Function(fem.functionspace(msh, ("DG", 0)))
+    pump_right = fem.Function(fem.functionspace(msh, ("DG", 0)))
 
     n_cav = 3 + 0.13j
     ka = 94.6
@@ -123,7 +123,7 @@ def system():
             cset(pump_left, cells, 0.0)
             cset(pump_right, cells, 0.0)
 
-    V = fem.FunctionSpace(msh, ("Lagrange", 3))
+    V = fem.functionspace(msh, ("Lagrange", 3))
 
     evaluator = algorithms.Evaluator(
         V,
