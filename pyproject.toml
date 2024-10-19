@@ -78,6 +78,7 @@ test = "pytest"
 [tool.pixi.feature.dev.dependencies]
 ipython = "*"
 matplotlib = ">=3.9.1,<4"
+mypy = ">=1.12.0,<2"
 
 [tool.pixi.environments]
 default = {features = [], solve-group = "default"}
