@@ -26,6 +26,7 @@ from saltx.assemble import assemble_form
 from saltx.lasing import NonLinearProblem
 from saltx.nonlasing import NonLasingLinearProblem
 from saltx.plot import plot_ellipse
+from saltx.trace import tracer
 
 log = logging.getLogger(__name__)
 
@@ -145,31 +146,32 @@ def test_evaltraj(system):
     t0 = time.monotonic()
     all_parametrized_modes = defaultdict(list)
     for midx in range(len(modes)):
-        initial_mode = modes[midx]
+        with tracer.span(f"midx={midx}"):
+            initial_mode = modes[midx]
 
-        initial_x.setValues(range(system.n), initial_mode.array)
-        initial_x.setValue(system.n, initial_mode.k)
-        assert initial_x.getSize() == system.n + 1
+            initial_x.setValues(range(system.n), initial_mode.array)
+            initial_x.setValue(system.n, initial_mode.k)
+            assert initial_x.getSize() == system.n + 1
 
-        for Di, D0 in enumerate(D0range):
-            log.info(f" {D0=} ".center(80, "#"))
-            log.error(f"Starting newton algorithm for mode @ k = {initial_mode.k}")
-            D0_constant.value = D0
+            for Di, D0 in enumerate(D0range):
+                log.info(f" {D0=} ".center(80, "#"))
+                log.error(f"Starting newton algorithm for mode @ k = {initial_mode.k}")
+                D0_constant.value = D0
 
-            all_parametrized_modes[D0].append(
-                algorithms.newton(
-                    nllp,
-                    nlL,
-                    nlA,
-                    initial_x,
-                    delta_x,
-                    solver,
-                    initial_mode.dof_at_maximum,
-                    initial_mode.bcs,
+                all_parametrized_modes[D0].append(
+                    algorithms.newton(
+                        nllp,
+                        nlL,
+                        nlA,
+                        initial_x,
+                        delta_x,
+                        solver,
+                        initial_mode.dof_at_maximum,
+                        initial_mode.bcs,
+                    )
                 )
-            )
-            # In this loop we use the current mode as an initial guess for the mode at
-            # the next D0 -> we keep initial_x as is.
+                # In this loop we use the current mode as an initial guess for the mode
+                # at the next D0 -> we keep initial_x as is.
 
     t_total = time.monotonic() - t0
     log.info(
