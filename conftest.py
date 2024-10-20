@@ -1,10 +1,12 @@
 import logging
+import pprint
 from pathlib import Path
 
 import matplotlib
 import pytest
 
 logging.getLogger("matplotlib").setLevel(logging.WARNING)
+logging.getLogger("PIL").setLevel(logging.WARNING)
 # doesn't work because ffcx changes the log-level at runtime, which is not good.
 logging.getLogger("ffcx").setLevel(logging.INFO)
 
@@ -19,10 +21,31 @@ def pytest_configure(config):
 
 
 @pytest.fixture(autouse=True)
-def _tracer():
-    import saltx.trace
+def _tracer(request):
+    from saltx.trace import tracer
 
-    saltx.trace.tracer.reset()
+    tracer.reset()
+
+    yield
+
+    st = tracer._span_tree
+
+    if not st:
+        # nothing needs to be saved
+        return
+
+    node = request.node
+
+    traces_path = Path("traces")
+    traces_path.mkdir(exist_ok=True)
+    fname = traces_path / f"{node.path.stem}_{node.name}.txt"
+
+    # if the test was not successful, this raises. TODO explicitly check test result and
+    # don't save anything if the test was not successful..
+    try:
+        fname.write_text(pprint.pformat(st))
+    except AttributeError:
+        pass
 
 
 class _Infra:
