@@ -54,7 +54,7 @@ def test_assemble_F_and_J():
     v = ufl.TestFunction(V)
 
     def assemble_form(form, diag=1.0):
-        mat = fem.petsc.assemble_matrix(fem.form(form), bcs=bcs, diagonal=diag)
+        mat = fem.petsc.assemble_matrix(fem.form(form), bcs=bcs, diag=diag)
         mat.assemble()
         return mat
 

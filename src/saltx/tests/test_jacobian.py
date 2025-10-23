@@ -8,7 +8,13 @@ import numpy as np
 import pytest
 import ufl
 from dolfinx import fem, mesh
-from dolfinx.fem.petsc import create_matrix_block, create_vector_block
+from dolfinx.fem.forms import extract_function_spaces
+from dolfinx.fem.petsc import (
+    assemble_vector,
+    create_matrix,
+    create_vector,
+    set_bc,
+)
 from mpi4py import MPI
 from petsc4py import PETSc
 from ufl import dx, inner, nabla_grad
@@ -25,11 +31,11 @@ def ass_linear_form(form):
     return fem.petsc.assemble_vector(fem.form(form))
 
 
-def ass_linear_form_into_vec(vec, form, a_form, bcs):
+def ass_linear_form_into_vec(vec, form):
     with vec.localForm() as vec_local:
         vec_local.set(0.0)
-    fem.petsc.assemble_vector_block(vec, fem.form(form), a_form, bcs=bcs)
-    # vec.assemble()
+
+    assemble_vector(vec, form)
 
 
 @pytest.mark.parametrize("nmodes", [1, 2])
@@ -47,12 +53,12 @@ def test_create_salt_jacobian_block_matrix(nmodes):
     form_list = [[dFRe_dv, dFRe_dw] * nmodes, [dFIm_dv, dFIm_dw] * nmodes] * nmodes
     form_array = fem.form(form_list)
 
-    block_mat = create_matrix_block(form_array)
-    fem.petsc.assemble_matrix_block(
+    block_mat = create_matrix(form_array)
+    fem.petsc.assemble_matrix(
         block_mat,
         form_array,
         bcs=[],
-        diagonal=1.0,
+        diag=1.0,
     )
     block_mat.assemble()
 
@@ -291,30 +297,38 @@ def test_create_and_assemble_salt_jacobian(nmodes):
 
     else:
         raise ValueError(nmodes)
-    mat_dF_dvw = create_matrix_block(form_array)
+    mat_dF_dvw = create_matrix(form_array)
 
-    fem.petsc.assemble_matrix_block(
+    fem.petsc.assemble_matrix(
         mat_dF_dvw,
         form_array,
         bcs=bcs,
     )
     mat_dF_dvw.assemble()
 
-    lin_form = [inner(ufl.real(b), v0) * dx, inner(ufl.imag(b), v1) * dx]
+    lin_form_ufl = [inner(ufl.real(b), v0) * dx, inner(ufl.imag(b), v1) * dx]
     if nmodes == 2:
-        lin_form = [
+        lin_form_ufl = [
             inner(ufl.real(b), v0) * dx,
             inner(ufl.imag(b), v1) * dx,
             inner(ufl.real(b), v2) * dx,
             inner(ufl.imag(b), v3) * dx,
         ]
 
-    vec_dF_dk = create_vector_block(fem.form(lin_form))
-    vec_dF_ds = create_vector_block(fem.form(lin_form))
-    ass_linear_form_into_vec(vec_dF_dk, lin_form, form_array, bcs)
-    fem.set_bc(vec_dF_dk, bcs)
-    ass_linear_form_into_vec(vec_dF_ds, lin_form, form_array, bcs)
-    fem.set_bc(vec_dF_ds, bcs)
+    lin_form = fem.form(lin_form_ufl)
+
+    vec_dF_dk = create_vector(
+        extract_function_spaces(lin_form), kind=PETSc.Vec.Type.MPI
+    )
+    vec_dF_ds = create_vector(
+        extract_function_spaces(lin_form), kind=PETSc.Vec.Type.MPI
+    )
+    ass_linear_form_into_vec(vec_dF_dk, lin_form)
+    # TODO do I need to call
+    # bcs1 = bcs_by_block(...)
+    set_bc(vec_dF_dk, bcs)
+    ass_linear_form_into_vec(vec_dF_ds, lin_form)
+    set_bc(vec_dF_ds, bcs)
 
     Print("Create salt jacobian")
     A = create_salt_jacobian_block_matrix(mat_dF_dvw, nmodes=nmodes)

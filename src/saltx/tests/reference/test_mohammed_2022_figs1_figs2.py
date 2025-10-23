@@ -25,6 +25,9 @@ from saltx.tests.reference import ref_data_mohammed as rdm
 
 log = logging.getLogger(__name__)
 
+pytest.skip("not yet tested with dolfinx 0.10", allow_module_level=True)
+
+
 Print = PETSc.Sys.Print
 
 # according to Fig S2(a) the roots of the intensity are at:

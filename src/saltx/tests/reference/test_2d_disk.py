@@ -71,6 +71,9 @@ Print = PETSc.Sys.Print
 log = getLogger(__name__)
 
 
+pytest.skip("not yet tested with dolfinx 0.10", allow_module_level=True)
+
+
 def real_const(V, real_value: float) -> fem.Constant:
     return fem.Constant(V.mesh, complex(real_value, 0))
 

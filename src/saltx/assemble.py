@@ -23,9 +23,9 @@ def assemble_form(form, bcs, diag=1.0, mat=None, name=""):
     suffix = ", new matrix" if mat is None else ", existing matrix"
     with Timer(log.info, f"assemble_matrix {name}{suffix}"):
         if mat is None:
-            mat = fem.petsc.assemble_matrix(fform, bcs=bcs, diagonal=diag)
+            mat = fem.petsc.assemble_matrix(fform, bcs=bcs, diag=diag)
         else:
             mat.zeroEntries()
-            fem.petsc.assemble_matrix(mat, fform, bcs=bcs, diagonal=diag)
+            fem.petsc.assemble_matrix(mat, fform, bcs=bcs, diag=diag)
         mat.assemble()
     return mat

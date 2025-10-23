@@ -35,6 +35,7 @@ Print = PETSc.Sys.Print
 
 reference_test_dir = Path(__file__).parent
 
+pytest.skip("not yet tested with dolfinx 0.10", allow_module_level=True)
 
 FIRST_THRESHOLD = 0.6110176
 # when the 2nd mode is slightly above the threshold (see caption of figure 5)

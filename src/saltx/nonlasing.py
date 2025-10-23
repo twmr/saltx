@@ -10,7 +10,7 @@ from typing import Any
 
 import ufl
 from dolfinx import fem
-from dolfinx.fem import dirichletbc
+from dolfinx.fem import dirichletbc, extract_function_spaces
 from dolfinx.fem.petsc import create_matrix, create_vector
 from mpi4py import MPI
 from petsc4py import PETSc
@@ -35,12 +35,7 @@ def ass_linear_form_into_vec(vec, form, bcs):
 def ass_bilinear_form(mat, form, bcs, diagonal):
     mat.zeroEntries()  # not sure if this is really needed
 
-    fem.petsc.assemble_matrix(
-        mat,
-        form,
-        bcs=bcs,
-        diagonal=diagonal,
-    )
+    fem.petsc.assemble_matrix(mat, form, bcs=bcs, diag=diagonal)
     mat.assemble()
 
 
@@ -103,9 +98,13 @@ class NonLasingLinearProblem:
         # initialize PETSc vectors to avoid repeated allocation in every iteration of
         # the Newton method.
         with tracer.span("Create initial matrix/vectors for J & F"):
-            self.vec_F_petsc = create_vector(self.form_Sb)
-            self.mat_dF_du = create_matrix(self.form_dFdu)
-            self.vec_dF_dk = create_vector(self.form_dFdk)
+            self.vec_F_petsc = create_vector(
+                extract_function_spaces(self.form_Sb), kind=PETSc.Vec.Type.MPI
+            )
+            self.mat_dF_du = create_matrix(self.form_dFdu, kind=PETSc.Vec.Type.MPI)
+            self.vec_dF_dk = create_vector(
+                extract_function_spaces(self.form_dFdk), kind=PETSc.Vec.Type.MPI
+            )
 
     def _demo_check_solutions(self, x: PETSc.Vec) -> None:
         b = fem.Function(self.V)
@@ -166,7 +165,7 @@ class NonLasingLinearProblem:
             ass_linear_form_into_vec(F_petsc, self.form_Sb, self.bcs)
         print(f"norm F_petsc {F_petsc.norm(0)}")
 
-        etbm1 = b.vector.getValue(dof_at_maximum) - 1
+        etbm1 = b.x.petsc_vec.getValue(dof_at_maximum) - 1
         if abs(etbm1) > 1e-12:
             print(f"{etbm1=}")
 

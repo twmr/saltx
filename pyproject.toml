@@ -63,17 +63,17 @@ platforms = ["linux-64"]
 saltx = { path = ".", editable = true }
 
 [tool.pixi.dependencies]
-python = "3.12.*"
-fenics-dolfinx = "0.7.3.*"
-mpi4py = ">=3.1.6,<4"  # pinning required, because dolfinx=0.7.3 is not compatible with mpi4py 4.0
+python = "3.14.*"
+fenics-dolfinx = ">=0.10.0,<0.11"
+mpi4py = ">=4.1.1,<5"
 
-matplotlib-base = ">=3.9.1,<4"
-pandas = ">=2.2.2,<3"
-scipy = ">=1.14.0,<2"
-petsc = { version = "==3.20.6", build = "complex_*" }
+matplotlib-base = ">=3.10.8,<4"
+pandas = ">=3.0.2,<4"
+scipy = ">=1.17.1,<2"
+petsc = { version = ">=3.25.0,<4", build = "complex_*" }
 
 [tool.pixi.feature.test.dependencies]
-pytest = ">=8.1.1,<8.2"
+pytest = ">=9.0.3,<10"
 [tool.pixi.feature.test.tasks]
 # In the `test` env this only works when `--hide-plots` is passed on
 # the command line, because then the mpl backend is set to 'agg'. If
@@ -84,9 +84,8 @@ pytest = ">=8.1.1,<8.2"
 test = "pytest"
 
 [tool.pixi.feature.dev.dependencies]
-ipython = "*"
-matplotlib = ">=3.9.1,<4"
-mypy = ">=1.12.0,<2"
+ipython = ">=9.12.0,<10"
+matplotlib = ">=3.10.8,<4"
 
 [tool.pixi.environments]
 default = {features = [], solve-group = "default"}

@@ -11,7 +11,15 @@ from typing import NamedTuple
 import numpy as np
 import ufl
 from dolfinx import fem
-from dolfinx.fem.petsc import create_matrix_block, create_vector_block
+from dolfinx.fem import bcs_by_block, extract_function_spaces
+from dolfinx.fem.petsc import (
+    apply_lifting,
+    assemble_matrix,
+    assemble_vector,
+    create_matrix,
+    create_vector,
+    set_bc,
+)
 from petsc4py import PETSc
 from ufl import dx, elem_mult, inner, nabla_grad
 
@@ -621,7 +629,7 @@ class NonLinearProblem:
         ]
 
         for b_row, _, _, dof_at_maximum in modes_data:
-            etbm1 = b_row.vector.getValue(dof_at_maximum) - 1
+            etbm1 = b_row.x.petsc_vec.getValue(dof_at_maximum) - 1
             if abs(etbm1) > 1e-12:
                 log.debug(f"{etbm1=}")
             etbm1s.extend([etbm1.real, etbm1.imag])
@@ -635,10 +643,22 @@ class NonLinearProblem:
         except KeyError:
             with Timer(log.warning, "creation of sparse dF_dvw matrix and vectors"):
                 with tracer.span("creating MatVecCollection", nmodes=nmodes):
-                    mat_dF_dvw = create_matrix_block(a_form_array)
-                    vec_F_petsc = create_vector_block(F_components)
-                    vec_dF_dk_seq = [create_vector_block(dF_dk) for dF_dk in dF_dk_seq]
-                    vec_dF_ds_seq = [create_vector_block(dF_ds) for dF_ds in dF_ds_seq]
+                    mat_dF_dvw = create_matrix(a_form_array, kind=PETSc.Vec.Type.MPI)
+                    vec_F_petsc = create_vector(
+                        extract_function_spaces(F_components), kind=PETSc.Vec.Type.MPI
+                    )
+                    vec_dF_dk_seq = [
+                        create_vector(
+                            extract_function_spaces(dF_dk), kind=PETSc.Vec.Type.MPI
+                        )
+                        for dF_dk in dF_dk_seq
+                    ]
+                    vec_dF_ds_seq = [
+                        create_vector(
+                            extract_function_spaces(dF_ds), kind=PETSc.Vec.Type.MPI
+                        )
+                        for dF_ds in dF_ds_seq
+                    ]
                     matvec_coll = MatVecCollection(
                         mat_dF_dvw=mat_dF_dvw,
                         vec_F_petsc=vec_F_petsc,
@@ -651,9 +671,14 @@ class NonLinearProblem:
         with tracer.span("assemble_vector_block F"):
             with matvec_coll.vec_F_petsc.localForm() as F_local:
                 F_local.set(0.0)
-            fem.petsc.assemble_vector_block(
-                matvec_coll.vec_F_petsc, F_components, a_form_array, bcs=new_bcs
+            assemble_vector(matvec_coll.vec_F_petsc, F_components)
+            bcs1 = bcs_by_block(extract_function_spaces(a_form_array, 1), new_bcs)
+            apply_lifting(matvec_coll.vec_F_petsc, a_form_array, bcs=bcs1)
+            matvec_coll.vec_F_petsc.ghostUpdate(
+                addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE
             )
+            bcs0 = bcs_by_block(extract_function_spaces(F_components), new_bcs)
+            set_bc(matvec_coll.vec_F_petsc, bcs0)
 
         # log.debug(f"norm F_petsc {F_petsc.norm(0)}")
         # S b = L.sub(0)
@@ -673,7 +698,7 @@ class NonLinearProblem:
             mat_dF_dvw.zeroEntries()  # not sure if this is really needed
 
             with Timer(log.debug, "  ass bilinear forms: matrix block"):
-                fem.petsc.assemble_matrix_block(
+                assemble_matrix(
                     mat_dF_dvw,
                     a_form_array,
                     bcs=new_bcs,
@@ -689,17 +714,27 @@ class NonLinearProblem:
                 with vec.localForm() as vec_local:
                     vec_local.set(0.0)
 
-                fem.petsc.assemble_vector_block(
-                    vec, fem.form(dF_dk), a_form_array, bcs=new_bcs
+                assemble_vector(vec, fem.form(dF_dk))
+                bcs1 = bcs_by_block(extract_function_spaces(a_form_array, 1), new_bcs)
+                apply_lifting(vec, a_form_array, bcs=bcs1)
+                vec.ghostUpdate(
+                    addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE
                 )
+                bcs0 = bcs_by_block(extract_function_spaces(dF_dk), new_bcs)
+                set_bc(vec, bcs0)
 
                 vec = vec_ds_seq[i]
                 with vec.localForm() as vec_local:
                     vec_local.set(0.0)
 
-                fem.petsc.assemble_vector_block(
-                    vec, fem.form(dF_ds), a_form_array, bcs=new_bcs
+                assemble_vector(vec, fem.form(dF_ds))
+                bcs1 = bcs_by_block(extract_function_spaces(a_form_array, 1), new_bcs)
+                apply_lifting(vec, a_form_array, bcs=bcs1)
+                vec.ghostUpdate(
+                    addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE
                 )
+                bcs0 = bcs_by_block(extract_function_spaces(dF_ds), new_bcs)
+                set_bc(vec, bcs0)
 
         with Timer(log.debug, "Assembly of Jacobian into block real matrix"):
             jacobian.assemble_salt_jacobian_block_matrix(
@@ -731,15 +766,15 @@ class NonLinearProblem:
         )
 
         with Timer(log.debug, "create_A"):
-            block_mat = create_matrix_block(form_array)
+            block_mat = create_matrix(form_array, kind=PETSc.Vec.Type.MPI)
 
             block_mat.zeroEntries()  # not sure if this is really needed
 
-            fem.petsc.assemble_matrix_block(
+            assemble_matrix(
                 block_mat,
                 form_array,
                 bcs=[],
-                diagonal=1.0,
+                diag=1.0,
             )
             block_mat.assemble()
 

@@ -505,7 +505,7 @@ def constant_pump_algorithm(
         Q = nevp_inputs.Q
         Q.zeroEntries()
         fem.petsc.assemble_matrix(
-            Q, nlp.get_Q_hbt_form(active_modes), bcs=mode.bcs, diagonal=0.0
+            Q, nlp.get_Q_hbt_form(active_modes), bcs=mode.bcs, diag=0.0
         )
         Q.assemble()
         log.debug("After assembly of Q with custom sht")

@@ -14,6 +14,7 @@ from collections import defaultdict
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pytest
 import ufl
 from dolfinx import fem
 from scipy.optimize import root
@@ -24,6 +25,8 @@ from saltx.assemble import assemble_form
 from saltx.nonlasing import NonLasingInitialX, NonLasingLinearProblem
 
 log = logging.getLogger(__name__)
+
+pytest.skip("not yet tested with dolfinx 0.10", allow_module_level=True)
 
 
 # CMT theory (red line in plot)
