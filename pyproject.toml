@@ -55,7 +55,7 @@ known-first-party = ["saltx"]
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
 
-[tool.pixi.project]
+[tool.pixi.workspace]
 channels = ["conda-forge"]
 platforms = ["linux-64"]
 
