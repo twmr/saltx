@@ -410,7 +410,7 @@ def test_eval_traj_D1_0p85(mohammed_system, infra):
         if rmode.k.imag < 1e-9:
             continue
 
-        intens, ctrl_modes, ctrl_evals = _refine_first_mode_and_calculate_nevp_again(
+        intens, _ctrl_modes, ctrl_evals = _refine_first_mode_and_calculate_nevp_again(
             rmode, nevp_inputs, nlp, system, newton_operators
         )
 

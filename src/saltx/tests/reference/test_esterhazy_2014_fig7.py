@@ -98,7 +98,7 @@ def map_function_to_circle_mesh(
     V_circle,
     V_quarter_circle,
 ) -> fem.Function:
-    """Creates a full-circle FEM func from a quarter-circle func with BCS."""
+    """Create a full-circle FEM func from a quarter-circle func with BCS."""
     circle_mode = fem.Function(V_circle)
     quadrant_signs = quadrant_signs_for_bcs[mode_on_quarter_circle.bcs_name]
 
@@ -404,7 +404,7 @@ def find_pairs(
 
 
 def create_bcs_on_quarter_mesh(system_quarter) -> dict[str, list]:
-    """Creates the BCs for the different symmetries of a quarter mesh."""
+    """Create the BCs for the different symmetries of a quarter mesh."""
 
     def on_outer_boundary(x):
         return np.isclose(x[0], system_quarter.pml_end) | np.isclose(
@@ -989,7 +989,7 @@ def test_solve_multimode_D0range(system, system_quarter, D0_range):
     with open("fig7_results.pickle", "wb") as fh:
         pickle.dump(sweep_results, fh, protocol=pickle.HIGHEST_PROTOCOL)
 
-    fig, ax = plt.subplots()
+    _fig, ax = plt.subplots()
     mode1_refdata = np.loadtxt(
         "./data/references/esterhazy_fig7/mode1.csv", delimiter=","
     )
@@ -1028,7 +1028,7 @@ def test_solve_multimode_D0range(system, system_quarter, D0_range):
 
     ax.grid(True)
 
-    fig, ax = plt.subplots()
+    _fig, ax = plt.subplots()
     ax.plot(moderes[:, 0], moderes[:, 2], "o")
     ax.grid(True)
 
@@ -1098,7 +1098,7 @@ def test_plot_modeintensities():
         ]
     )
 
-    fig, ax = plt.subplots()
+    _fig, ax = plt.subplots()
     # parse the reference results from the paper
     mode1_refdata = np.loadtxt(
         "./data/references/esterhazy_fig7/mode1.csv", delimiter=","

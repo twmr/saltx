@@ -44,10 +44,16 @@ select = [
     "PT",
     "PERF",
     "RUF",
+    # pydocstyle"
+    # "D",
+    "D401",
 ]
 
 [tool.ruff.lint.isort]
 known-first-party = ["saltx"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
 
 [tool.pixi.project]
 channels = ["conda-forge"]

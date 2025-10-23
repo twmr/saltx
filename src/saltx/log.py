@@ -23,10 +23,10 @@ DEFAULT_LOG_DATE_FORMAT = "%H:%M:%S"
 
 class Timer:
     __slots__ = (
-        "msg",
-        "stream",
-        "start",
         "elapsed",
+        "msg",
+        "start",
+        "stream",
     )
 
     def __init__(self, stream, msg=None):
@@ -110,7 +110,7 @@ class ColoredLevelFormatter(logging.Formatter):
 
         # add ANSI escape sequences around the formatted levelname
         colorized_formatted_levelname = colorize(
-            "|%09s | " % formatted_levelname, color_opts
+            f"|{formatted_levelname:>9} | ", color_opts
         )
         self._level_to_fmt_mapping[level] = self.LEVELNAME_FMT_REGEX.sub(
             colorized_formatted_levelname, self._fmt

@@ -473,7 +473,7 @@ def test_intensity_vs_pump_esterhazy(system):
 
     # TODO The threshold of the first mode matches the one of the paper, but the 2nd
     # mode activates at a higher pump at not around D0=0.189.
-    fig, ax = plt.subplots()
+    _fig, ax = plt.subplots()
     ax.plot(
         [D0 for (D0, _) in results],
         [intens for (_, intens) in results],

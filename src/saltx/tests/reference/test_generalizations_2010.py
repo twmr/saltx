@@ -516,7 +516,7 @@ def test_intensity_vs_pump(system, infra):
         assert evals.size
 
         def check_is_single_mode(refined_mode):
-            """Returns True when no other NEVP modes lie above the real
+            """Return True when no other NEVP modes lie above the real
             axis."""
             # solve again the NEVP with CISS, but with a single mode in the hole burning
             # term.
