@@ -8,6 +8,7 @@ Maxwell-Bloch theory".
 
 See https://doi.org/10.1063/5.0105963
 """
+
 import logging
 
 import matplotlib.pyplot as plt

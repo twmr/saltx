@@ -8,6 +8,7 @@ Generalizations and analytic results".
 
 See https://journals.aps.org/pra/abstract/10.1103/PhysRevA.82.063824.
 """
+
 import logging
 from collections import namedtuple
 from fractions import Fraction

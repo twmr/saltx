@@ -4,6 +4,7 @@
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 """Unit tests of the lasing.py module."""
+
 import logging
 
 import numpy as np
