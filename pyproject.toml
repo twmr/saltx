@@ -67,13 +67,13 @@ python = "3.12.*"
 fenics-dolfinx = "0.7.3.*"
 mpi4py = ">=3.1.6,<4"  # pinning required, because dolfinx=0.7.3 is not compatible with mpi4py 4.0
 
-matplotlib-base = ">=3.9.1,<4"
-pandas = ">=2.2.2,<3"
-scipy = ">=1.14.0,<2"
+matplotlib-base = ">=3.10.0,<4"
+pandas = ">=3.0.2,<4"
+scipy = ">=1.17.0,<2"
 petsc = { version = "==3.20.6", build = "complex_*" }
 
 [tool.pixi.feature.test.dependencies]
-pytest = ">=8.1.1,<8.2"
+pytest = ">=9.0.3,<9.2"
 [tool.pixi.feature.test.tasks]
 # In the `test` env this only works when `--hide-plots` is passed on
 # the command line, because then the mpl backend is set to 'agg'. If
@@ -85,7 +85,7 @@ test = "pytest"
 
 [tool.pixi.feature.dev.dependencies]
 ipython = "*"
-matplotlib = ">=3.9.1,<4"
+matplotlib = ">=3.10.0,<4"
 mypy = ">=1.12.0,<2"
 
 [tool.pixi.environments]
