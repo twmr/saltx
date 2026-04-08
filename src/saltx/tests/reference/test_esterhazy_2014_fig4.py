@@ -8,6 +8,7 @@ initio laser theory".
 
 See https://link.aps.org/doi/10.1103/PhysRevA.90.023816.
 """
+
 import logging
 import time
 from collections import defaultdict, namedtuple
