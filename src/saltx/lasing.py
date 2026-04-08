@@ -621,7 +621,7 @@ class NonLinearProblem:
         ]
 
         for b_row, _, _, dof_at_maximum in modes_data:
-            etbm1 = b_row.vector.getValue(dof_at_maximum) - 1
+            etbm1 = b_row.x.petsc_vec.getValue(dof_at_maximum) - 1
             if abs(etbm1) > 1e-12:
                 log.debug(f"{etbm1=}")
             etbm1s.extend([etbm1.real, etbm1.imag])

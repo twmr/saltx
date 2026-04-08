@@ -166,7 +166,7 @@ class NonLasingLinearProblem:
             ass_linear_form_into_vec(F_petsc, self.form_Sb, self.bcs)
         print(f"norm F_petsc {F_petsc.norm(0)}")
 
-        etbm1 = b.vector.getValue(dof_at_maximum) - 1
+        etbm1 = b.x.petsc_vec.getValue(dof_at_maximum) - 1
         if abs(etbm1) > 1e-12:
             print(f"{etbm1=}")
 
