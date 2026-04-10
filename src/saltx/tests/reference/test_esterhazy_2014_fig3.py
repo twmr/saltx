@@ -97,7 +97,7 @@ def system():
 
     msh = mesh.create_interval(MPI.COMM_WORLD, points=(0, L), nx=1024)
 
-    V = fem.FunctionSpace(msh, ("Lagrange", 3))
+    V = fem.functionspace(msh, ("Lagrange", 3))
 
     evaluator = algorithms.Evaluator(
         V,
