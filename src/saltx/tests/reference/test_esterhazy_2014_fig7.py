@@ -595,7 +595,7 @@ def determine_circulating_mode_at_D0(
         )
 
         circulating_mode1 = build_circulating_mode(
-            maxkimag_pair.k, mode_1a.vector.getArray(), mode_1b.vector.getArray()
+            maxkimag_pair.k, mode_1a.x.array, mode_1b.x.array
         )
         circulating_modes.append(circulating_mode1)
 
